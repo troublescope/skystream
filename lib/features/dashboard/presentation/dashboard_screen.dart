@@ -2,10 +2,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/tmdb_provider.dart';
+import 'view_all_screen.dart'; // Import ViewAllScreen/Category
 import 'widgets/dashboard_carousel.dart';
 import 'widgets/media_horizontal_list.dart';
 import 'widgets/unified_filter_dialog.dart';
+import '../../../shared/widgets/tv_cards_wrapper.dart'; // Import TvCardsWrapper
 import '../data/filter_provider.dart';
+import 'delegates/dashboard_search_delegate.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -95,7 +98,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 24,
-                letterSpacing: 1.2,
               ),
             ),
             centerTitle: false,
@@ -103,13 +105,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               // Unified Filter Button
               Padding(
                 padding: const EdgeInsets.only(right: 8.0),
-                child: GestureDetector(
+                child: TvCardsWrapper(
                   onTap: () {
                     showDialog(
                       context: context,
                       builder: (context) => const UnifiedFilterDialog(),
                     );
                   },
+                  borderRadius: BorderRadius.circular(50),
                   child: Consumer(
                     builder: (context, ref, _) {
                       final filters = ref.watch(dashboardFilterProvider);
@@ -140,19 +143,24 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               // Search Button
               Padding(
                 padding: const EdgeInsets.only(right: 16.0),
-                child: CircleAvatar(
-                  backgroundColor: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withOpacity(0.1),
-                  radius: 18,
-                  child: IconButton(
-                    icon: Icon(
+                child: TvCardsWrapper(
+                  onTap: () {
+                    showSearch(
+                      context: context,
+                      delegate: DashboardSearchDelegate(ref),
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(50),
+                  child: CircleAvatar(
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withOpacity(0.1),
+                    radius: 18,
+                    child: Icon(
                       Icons.search,
                       color: Theme.of(context).colorScheme.onSurface,
                       size: 18,
                     ),
-                    padding: EdgeInsets.zero,
-                    onPressed: () {},
                   ),
                 ),
               ),
@@ -184,32 +192,56 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
               // Section: Popular Movies
               SliverToBoxAdapter(
-                child: _buildSection(popularMoviesAsync, "Popular Movies"),
+                child: _buildSection(
+                  popularMoviesAsync,
+                  "Popular Movies",
+                  ViewAllCategory.popularMovies,
+                ),
               ),
 
               // Section: Popular TV Shows
               SliverToBoxAdapter(
-                child: _buildSection(popularTVAsync, "Popular TV Shows"),
+                child: _buildSection(
+                  popularTVAsync,
+                  "Popular TV Shows",
+                  ViewAllCategory.popularTV,
+                ),
               ),
 
               // Section: New Movies
               SliverToBoxAdapter(
-                child: _buildSection(nowPlayingAsync, "New Movies"),
+                child: _buildSection(
+                  nowPlayingAsync,
+                  "New Movies",
+                  ViewAllCategory.nowPlayingMovies,
+                ),
               ),
 
               // Section: New TV Shows
               SliverToBoxAdapter(
-                child: _buildSection(onTheAirTVAsync, "New TV Shows"),
+                child: _buildSection(
+                  onTheAirTVAsync,
+                  "New TV Shows",
+                  ViewAllCategory.onTheAirTV,
+                ),
               ),
 
               // Section: Featured Movies
               SliverToBoxAdapter(
-                child: _buildSection(topRatedMoviesAsync, "Featured Movies"),
+                child: _buildSection(
+                  topRatedMoviesAsync,
+                  "Featured Movies",
+                  ViewAllCategory.topRatedMovies,
+                ),
               ),
 
               // Section: Featured TV Shows
               SliverToBoxAdapter(
-                child: _buildSection(topRatedTVAsync, "Featured TV Shows"),
+                child: _buildSection(
+                  topRatedTVAsync,
+                  "Featured TV Shows",
+                  ViewAllCategory.topRatedTV,
+                ),
               ),
 
               // Section: Airing Today
@@ -217,6 +249,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 child: _buildSection(
                   airingTodayTVAsync,
                   "Last videos TV Shows",
+                  ViewAllCategory.airingTodayTV,
                 ),
               ),
 
@@ -233,11 +266,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Widget _buildSection(
     AsyncValue<List<Map<String, dynamic>>> asyncValue,
     String title,
+    ViewAllCategory category,
   ) {
     return asyncValue.when(
       data: (items) {
         if (items.isEmpty) return const SizedBox.shrink();
-        return MediaHorizontalList(title: title, mediaList: items);
+        return MediaHorizontalList(
+          title: title,
+          mediaList: items,
+          category: category,
+        );
       },
       loading: () => SizedBox(
         height: 250,

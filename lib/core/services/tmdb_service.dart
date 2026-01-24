@@ -4,7 +4,15 @@ import '../config/tmdb_config.dart';
 class TmdbService {
   final Dio _dio;
 
-  TmdbService() : _dio = Dio(BaseOptions(baseUrl: TmdbConfig.baseUrl));
+  TmdbService()
+    : _dio = Dio(
+        BaseOptions(
+          baseUrl: TmdbConfig.baseUrl,
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 10),
+          sendTimeout: const Duration(seconds: 10),
+        ),
+      );
 
   Future<List<Map<String, dynamic>>> getGenres({
     String language = 'en-US',
@@ -32,6 +40,7 @@ class TmdbService {
     int? genreId,
     int? year,
     double? minRating,
+    int page = 1,
   }) async {
     if (language != 'en-US' ||
         genreId != null ||
@@ -44,9 +53,10 @@ class TmdbService {
         genreId: genreId,
         year: year,
         minRating: minRating,
+        page: page,
       );
     }
-    return _getResults('/trending/all/day', language: language);
+    return _getResults('/trending/all/day', language: language, page: page);
   }
 
   Future<List<Map<String, dynamic>>> getPopularMovies({
@@ -54,6 +64,7 @@ class TmdbService {
     int? genreId,
     int? year,
     double? minRating,
+    int page = 1,
   }) async {
     return _getDiscoveryResults(
       '/discover/movie',
@@ -62,6 +73,7 @@ class TmdbService {
       genreId: genreId,
       year: year,
       minRating: minRating,
+      page: page,
     );
   }
 
@@ -70,6 +82,7 @@ class TmdbService {
     int? genreId,
     int? year,
     double? minRating,
+    int page = 1,
   }) async {
     return _getDiscoveryResults(
       '/discover/movie',
@@ -78,6 +91,7 @@ class TmdbService {
       genreId: genreId,
       year: year,
       minRating: minRating,
+      page: page,
     );
   }
 
@@ -86,6 +100,7 @@ class TmdbService {
     int? genreId,
     int? year,
     double? minRating,
+    int page = 1,
   }) async {
     if (genreId != null || year != null || minRating != null) {
       return _getDiscoveryResults(
@@ -95,6 +110,7 @@ class TmdbService {
         genreId: genreId,
         year: year,
         minRating: minRating,
+        page: page,
         additionalParams: {
           'release_date.lte': DateTime.now().toString().split(' ')[0],
         },
@@ -106,12 +122,13 @@ class TmdbService {
         '/discover/movie',
         language,
         'release_date.desc',
+        page: page,
         additionalParams: {
           'release_date.lte': DateTime.now().toString().split(' ')[0],
         },
       );
     }
-    return _getResults('/movie/now_playing', language: language);
+    return _getResults('/movie/now_playing', language: language, page: page);
   }
 
   Future<List<Map<String, dynamic>>> getTrendingMovies({
@@ -119,6 +136,7 @@ class TmdbService {
     int? genreId,
     int? year,
     double? minRating,
+    int page = 1,
   }) async {
     if (language != 'en-US' ||
         genreId != null ||
@@ -131,9 +149,10 @@ class TmdbService {
         genreId: genreId,
         year: year,
         minRating: minRating,
+        page: page,
       );
     }
-    return _getResults('/trending/movie/week', language: language);
+    return _getResults('/trending/movie/week', language: language, page: page);
   }
 
   Future<List<Map<String, dynamic>>> getTrendingAllDay({
@@ -141,6 +160,7 @@ class TmdbService {
     int? genreId,
     int? year,
     double? minRating,
+    int page = 1,
   }) async {
     if (language != 'en-US' ||
         genreId != null ||
@@ -153,9 +173,10 @@ class TmdbService {
         genreId: genreId,
         year: year,
         minRating: minRating,
+        page: page,
       );
     }
-    return _getResults('/trending/all/day', language: language);
+    return _getResults('/trending/all/day', language: language, page: page);
   }
 
   Future<List<Map<String, dynamic>>> getOnTheAirTV({
@@ -163,6 +184,7 @@ class TmdbService {
     int? genreId,
     int? year,
     double? minRating,
+    int page = 1,
   }) async {
     if (genreId != null ||
         year != null ||
@@ -175,9 +197,10 @@ class TmdbService {
         genreId: genreId,
         year: year,
         minRating: minRating,
+        page: page,
       );
     }
-    return _getResults('/tv/on_the_air', language: language);
+    return _getResults('/tv/on_the_air', language: language, page: page);
   }
 
   Future<List<Map<String, dynamic>>> getPopularTV({
@@ -185,6 +208,7 @@ class TmdbService {
     int? genreId,
     int? year,
     double? minRating,
+    int page = 1,
   }) async {
     return _getDiscoveryResults(
       '/discover/tv',
@@ -193,6 +217,7 @@ class TmdbService {
       genreId: genreId,
       year: year,
       minRating: minRating,
+      page: page,
     );
   }
 
@@ -201,6 +226,7 @@ class TmdbService {
     int? genreId,
     int? year,
     double? minRating,
+    int page = 1,
   }) async {
     return _getDiscoveryResults(
       '/discover/tv',
@@ -209,6 +235,7 @@ class TmdbService {
       genreId: genreId,
       year: year,
       minRating: minRating,
+      page: page,
     );
   }
 
@@ -217,6 +244,7 @@ class TmdbService {
     int? genreId,
     int? year,
     double? minRating,
+    int page = 1,
   }) async {
     if (genreId != null ||
         year != null ||
@@ -229,9 +257,67 @@ class TmdbService {
         genreId: genreId,
         year: year,
         minRating: minRating,
+        page: page,
       );
     }
-    return _getResults('/tv/airing_today', language: language);
+    return _getResults('/tv/airing_today', language: language, page: page);
+  }
+
+  Future<List<Map<String, dynamic>>> multiSearch({
+    required String query,
+    String language = 'en-US',
+    int page = 1,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '/search/multi',
+        queryParameters: {
+          'api_key': TmdbConfig.apiKey,
+          'language': language,
+          'query': query,
+          'page': page,
+          'include_adult': false,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final results = List<Map<String, dynamic>>.from(
+          response.data['results'],
+        );
+
+        final today = DateTime.now();
+
+        return results.where((item) {
+          final mediaType = item['media_type'];
+          // Keep only movies and tv
+          if (mediaType != 'movie' && mediaType != 'tv') return false;
+
+          // Check release status
+          String? dateStr;
+          if (mediaType == 'movie') {
+            dateStr = item['release_date'];
+          } else if (mediaType == 'tv') {
+            dateStr = item['first_air_date'];
+          }
+
+          // Exclude if no date provided
+          if (dateStr == null || dateStr.isEmpty) return false;
+
+          try {
+            final date = DateTime.parse(dateStr);
+            // Allow if date is before or strictly equal to today (ignoring time if parsed is midnight)
+            // DateTime.parse("yyyy-mm-dd") gives midnight local (or utc? usually local if no 'Z')
+            // Actually it keeps it straightforward.
+            return date.isBefore(today);
+          } catch (e) {
+            return false;
+          }
+        }).toList();
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
   }
 
   Future<List<Map<String, dynamic>>> _getDiscoveryResults(
@@ -242,6 +328,7 @@ class TmdbService {
     int? genreId,
     int? year,
     double? minRating,
+    int page = 1,
   }) async {
     try {
       final isoCode = fullLanguageCode.split('-')[0];
@@ -252,7 +339,7 @@ class TmdbService {
         'api_key': TmdbConfig.apiKey,
         'language': 'en-US', // Always show titles in English per user request
         'sort_by': sortBy,
-        'page': 1,
+        'page': page,
         'include_null_first_air_dates': false,
         'vote_count.gte': 100, // Basic filter to avoid garbage with 1 vote
         // Content Filter: Original Language
@@ -285,11 +372,16 @@ class TmdbService {
   Future<List<Map<String, dynamic>>> _getResults(
     String path, {
     String language = 'en-US',
+    int page = 1,
   }) async {
     try {
       final response = await _dio.get(
         path,
-        queryParameters: {'api_key': TmdbConfig.apiKey, 'language': language},
+        queryParameters: {
+          'api_key': TmdbConfig.apiKey,
+          'language': language,
+          'page': page,
+        },
       );
       if (response.statusCode == 200) {
         return List<Map<String, dynamic>>.from(response.data['results']);

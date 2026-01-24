@@ -2,20 +2,49 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/config/tmdb_config.dart';
 import '../../../details/presentation/tmdb_movie_details_screen.dart';
+import '../../../../shared/widgets/desktop_scroll_wrapper.dart'; // Import DesktopScrollWrapper
+import '../../../../shared/widgets/tv_cards_wrapper.dart'; // Import TvCardsWrapper
+import '../view_all_screen.dart'; // Import ViewAllScreen
 
-class MediaHorizontalList extends StatelessWidget {
+class MediaHorizontalList extends StatefulWidget {
   final String title;
   final List<Map<String, dynamic>> mediaList;
+  final ViewAllCategory category;
 
   const MediaHorizontalList({
     super.key,
     required this.title,
     required this.mediaList,
+    required this.category,
   });
 
   @override
+  State<MediaHorizontalList> createState() => _MediaHorizontalListState();
+}
+
+class _MediaHorizontalListState extends State<MediaHorizontalList> {
+  late ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (mediaList.isEmpty) return const SizedBox.shrink();
+    if (widget.mediaList.isEmpty) return const SizedBox.shrink();
+
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth > 800;
+    final cardWidth = isDesktop ? 200.0 : 130.0;
+    final listHeight = isDesktop ? 350.0 : 200.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -32,16 +61,16 @@ class MediaHorizontalList extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    title,
+                    widget.title,
                     style: TextStyle(
-                      fontSize: 20,
+                      fontSize: isDesktop ? 24 : 20,
                       fontWeight: FontWeight.bold,
                       color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Container(
-                    width: 20, // Accent width
+                    width: isDesktop ? 30 : 20, // Accent width
                     height: 3,
                     decoration: BoxDecoration(
                       color: Colors.blueAccent, // Nuvio blue
@@ -52,8 +81,19 @@ class MediaHorizontalList extends StatelessWidget {
               ),
 
               // View All Button (Dark Pill)
-              GestureDetector(
-                onTap: () {},
+              TvCardsWrapper(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => ViewAllScreen(
+                        title: widget.title,
+                        initialMediaList: widget.mediaList,
+                        category: widget.category,
+                      ),
+                    ),
+                  );
+                },
+                borderRadius: BorderRadius.circular(20),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
@@ -95,97 +135,104 @@ class MediaHorizontalList extends StatelessWidget {
 
         // List
         SizedBox(
-          height: 200, // Adjusted for 2:3 ratio within list
-          child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            scrollDirection: Axis.horizontal,
-            itemCount: mediaList.length,
-            separatorBuilder: (context, index) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              final item = mediaList[index];
-              final posterPath = item['poster_path'];
-              final imageUrl = posterPath != null
-                  ? '${TmdbConfig.imageBaseUrl}$posterPath'
-                  : 'https://via.placeholder.com/150x225';
-              final itemTitle = item['title'] ?? item['name'] ?? 'Unknown';
-              final uniqueTag =
-                  'list_${title}_${item['id']}_${itemTitle.hashCode}';
-              final mediaType =
-                  item['media_type'] ??
-                  (item['title'] != null ? 'movie' : 'tv');
+          height: listHeight, // Adjusted for 2:3 ratio within list
+          child: DesktopScrollWrapper(
+            // Wraps ListView
+            controller: _scrollController,
+            child: ListView.separated(
+              controller: _scrollController, // Passes controller
+              clipBehavior: Clip.none,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              scrollDirection: Axis.horizontal,
+              itemCount: widget.mediaList.length,
+              separatorBuilder: (context, index) =>
+                  SizedBox(width: isDesktop ? 24 : 12),
+              itemBuilder: (context, index) {
+                final item = widget.mediaList[index];
+                final posterPath = item['poster_path'];
+                final imageUrl = posterPath != null
+                    ? '${TmdbConfig.imageBaseUrl}$posterPath'
+                    : 'https://via.placeholder.com/150x225';
+                final itemTitle = item['title'] ?? item['name'] ?? 'Unknown';
+                final uniqueTag =
+                    'list_${widget.title}_${item['id']}_${itemTitle.hashCode}';
+                final mediaType =
+                    item['media_type'] ??
+                    (item['title'] != null ? 'movie' : 'tv');
 
-              return GestureDetector(
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => TmdbMovieDetailsScreen(
-                        movieId: item['id'],
-                        mediaType: mediaType,
-                        heroTag: uniqueTag,
-                        placeholderPoster: imageUrl,
+                return TvCardsWrapper(
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => TmdbMovieDetailsScreen(
+                          movieId: item['id'],
+                          mediaType: mediaType,
+                          heroTag: uniqueTag,
+                          placeholderPoster: imageUrl,
+                        ),
                       ),
-                    ),
-                  );
-                },
-                child: SizedBox(
-                  width: 130, // Fixed width for poster
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Poster Image
-                      Expanded(
-                        child: Hero(
-                          tag: uniqueTag,
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: CachedNetworkImage(
-                              imageUrl: imageUrl,
-                              fit: BoxFit.cover,
-                              width: double.infinity,
-                              placeholder: (context, url) => Container(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.surfaceContainerHighest,
-                                child: const Center(
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                              ),
-                              errorWidget: (context, url, error) => Container(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.surfaceContainerHighest,
-                                child: Icon(
-                                  Icons.error_outline,
+                    );
+                  },
+                  child: SizedBox(
+                    width: cardWidth, // Fixed width for poster
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Poster Image
+                        Expanded(
+                          child: Hero(
+                            tag: uniqueTag,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: CachedNetworkImage(
+                                imageUrl: imageUrl,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                placeholder: (context, url) => Container(
                                   color: Theme.of(
                                     context,
-                                  ).colorScheme.onSurface.withOpacity(0.2),
+                                  ).colorScheme.surfaceContainerHighest,
+                                  child: const Center(
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                ),
+                                errorWidget: (context, url, error) => Container(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.surfaceContainerHighest,
+                                  child: Icon(
+                                    Icons.error_outline,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface.withOpacity(0.2),
+                                  ),
                                 ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      // Title below poster
-                      Text(
-                        itemTitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withOpacity(0.8),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                        const SizedBox(height: 8),
+                        // Title below poster
+                        Text(
+                          itemTitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withOpacity(0.8),
+                            fontSize: isDesktop ? 22 : 14,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
         ),
       ],

@@ -5,6 +5,7 @@ import 'package:skystream/core/domain/entity/multimedia_item.dart';
 import 'package:skystream/core/extensions/extension_manager.dart';
 import '../details_screen.dart';
 import '../../../../shared/widgets/desktop_scroll_wrapper.dart';
+import '../../../../shared/widgets/tv_cards_wrapper.dart'; // Import TvCardsWrapper
 
 // Provider Result wrapper
 class ProviderSearchResult {
@@ -161,6 +162,7 @@ class _ProviderSearchSectionState extends ConsumerState<ProviderSearchSection> {
               controller: _scrollController,
               child: ListView.separated(
                 controller: _scrollController,
+                clipBehavior: Clip.none,
                 scrollDirection: Axis.horizontal,
                 padding: widget.compact
                     ? EdgeInsets.zero
@@ -172,7 +174,7 @@ class _ProviderSearchSectionState extends ConsumerState<ProviderSearchSection> {
                   final item = data['item'] as MultimediaItem;
                   final providerName = data['providerName'] as String;
 
-                  return GestureDetector(
+                  return TvCardsWrapper(
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
@@ -272,11 +274,14 @@ class _ProviderSearchSectionState extends ConsumerState<ProviderSearchSection> {
             ),
           );
         },
-        loading: () => const Center(
-          child: SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(strokeWidth: 2),
+        loading: () => const SizedBox(
+          height: 140, // Fix 2: Force height for centering
+          child: Center(
+            child: SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
           ),
         ),
         error: (err, _) => Padding(
@@ -291,6 +296,7 @@ class _ProviderSearchSectionState extends ConsumerState<ProviderSearchSection> {
     return Container(
       width: double.infinity,
       constraints: const BoxConstraints(minHeight: 180),
+      clipBehavior: Clip.hardEdge, // Fix 1: Clip content to container borders
       decoration: BoxDecoration(
         color: Theme.of(
           context,
@@ -315,11 +321,33 @@ class _ProviderSearchSectionState extends ConsumerState<ProviderSearchSection> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  "Available Sources (Beta)",
+                  "Available Sources",
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                     color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Fix 3: Styled Beta Tag
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    "BETA",
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],

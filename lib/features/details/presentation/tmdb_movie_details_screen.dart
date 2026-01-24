@@ -10,6 +10,7 @@ import '../../dashboard/data/tmdb_provider.dart';
 import '../../dashboard/data/language_provider.dart';
 import 'widgets/provider_search_section.dart';
 import '../../../shared/widgets/desktop_scroll_wrapper.dart';
+import '../../../shared/widgets/tv_cards_wrapper.dart'; // Import TvCardsWrapper
 
 // ignore: camel_case_types
 class MovieDetailsParams {
@@ -148,11 +149,38 @@ class _TmdbMovieDetailsScreenState
           }
           return _buildMobileLayout(data);
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, st) => Center(
-          child: Text(
-            "Error: $e",
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
+        loading: () => Scaffold(
+          backgroundColor: Colors.transparent,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            leading: const BackButton(),
+          ),
+          body: const Center(child: CircularProgressIndicator()),
+        ),
+        error: (e, st) => Scaffold(
+          backgroundColor: Colors.transparent,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            leading: const BackButton(),
+          ),
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  "Failed to load content",
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: () => ref.refresh(movieDetailsProvider(params)),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text("Retry"),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -618,6 +646,7 @@ class _TmdbMovieDetailsScreenState
                       child: DesktopScrollWrapper(
                         controller: _castScrollController,
                         child: ListView.separated(
+                          clipBehavior: Clip.none,
                           controller: _castScrollController,
                           scrollDirection: Axis.horizontal,
                           itemCount: cast.length,
@@ -626,50 +655,54 @@ class _TmdbMovieDetailsScreenState
                           itemBuilder: (context, index) {
                             final actor = cast[index];
                             final p = actor['profile_path'];
-                            return Column(
-                              children: [
-                                CircleAvatar(
-                                  radius: 40,
-                                  backgroundImage: p != null
-                                      ? NetworkImage(
-                                          '${TmdbConfig.imageBaseUrl}$p',
-                                        )
-                                      : null,
-                                  child: p == null
-                                      ? const Icon(
-                                          Icons.person,
-                                          color: Colors.grey,
-                                        )
-                                      : null,
-                                ),
-                                const SizedBox(height: 8),
-                                SizedBox(
-                                  width: 80,
-                                  child: Text(
-                                    actor['name'],
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    textAlign: TextAlign.center,
+                            return TvCardsWrapper(
+                              onTap: () {},
+                              borderRadius: BorderRadius.circular(40),
+                              child: Column(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 40,
+                                    backgroundImage: p != null
+                                        ? NetworkImage(
+                                            '${TmdbConfig.imageBaseUrl}$p',
+                                          )
+                                        : null,
+                                    child: p == null
+                                        ? const Icon(
+                                            Icons.person,
+                                            color: Colors.grey,
+                                          )
+                                        : null,
                                   ),
-                                ),
-                                SizedBox(
-                                  width: 80,
-                                  child: Text(
-                                    actor['character'] ?? '',
-                                    style: const TextStyle(
-                                      color: Colors.white54,
-                                      fontSize: 10,
+                                  const SizedBox(height: 8),
+                                  SizedBox(
+                                    width: 80,
+                                    child: Text(
+                                      actor['name'],
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      textAlign: TextAlign.center,
                                     ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    textAlign: TextAlign.center,
                                   ),
-                                ),
-                              ],
+                                  SizedBox(
+                                    width: 80,
+                                    child: Text(
+                                      actor['character'] ?? '',
+                                      style: const TextStyle(
+                                        color: Colors.white54,
+                                        fontSize: 10,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             );
                           },
                         ),
@@ -694,6 +727,7 @@ class _TmdbMovieDetailsScreenState
                       child: DesktopScrollWrapper(
                         controller: _trailerScrollController,
                         child: ListView.separated(
+                          clipBehavior: Clip.none,
                           controller: _trailerScrollController,
                           scrollDirection: Axis.horizontal,
                           itemCount: trailers.length,
@@ -702,7 +736,7 @@ class _TmdbMovieDetailsScreenState
                           itemBuilder: (context, index) {
                             final video = trailers[index];
                             final key = video['key'];
-                            return GestureDetector(
+                            return TvCardsWrapper(
                               onTap: () {
                                 launchUrl(
                                   Uri.parse(
@@ -867,6 +901,7 @@ class _TmdbMovieDetailsScreenState
             controller: _episodeScrollController,
             child: ListView.separated(
               controller: _episodeScrollController,
+              clipBehavior: Clip.none,
               scrollDirection: Axis.horizontal,
               itemCount: episodes.length,
               separatorBuilder: (_, __) => const SizedBox(width: 16),
@@ -882,7 +917,7 @@ class _TmdbMovieDetailsScreenState
                     ? '${hours}h ${minutes}m'
                     : '${minutes}m';
 
-                return GestureDetector(
+                return TvCardsWrapper(
                   onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -899,6 +934,7 @@ class _TmdbMovieDetailsScreenState
                       ),
                     );
                   },
+                  borderRadius: BorderRadius.circular(8),
                   child: Container(
                     width: 300,
                     decoration: BoxDecoration(
@@ -993,7 +1029,7 @@ class _TmdbMovieDetailsScreenState
   Widget _buildMobileLayout(Map<String, dynamic> data) {
     // Data Extraction
     final isMovie = widget.mediaType == 'movie';
-    final posterPath = data['poster_path'];
+
     final backdropPath = data['backdrop_path'];
     var title = data['title'] ?? data['name'] ?? '';
     var overview = data['overview'] ?? '';
@@ -1481,62 +1517,67 @@ class _TmdbMovieDetailsScreenState
                   SizedBox(
                     height: 140,
                     child: ListView.builder(
+                      clipBehavior: Clip.none,
                       scrollDirection: Axis.horizontal,
                       itemCount: cast.length,
                       itemBuilder: (context, index) {
                         final member = cast[index];
                         final profilePath = member['profile_path'];
-                        return Container(
-                          width: 90,
-                          margin: const EdgeInsets.only(right: 16),
-                          child: Column(
-                            children: [
-                              CircleAvatar(
-                                radius: 35,
-                                backgroundColor: Colors.grey[800],
-                                backgroundImage: profilePath != null
-                                    ? CachedNetworkImageProvider(
-                                        '${TmdbConfig.imageBaseUrl}$profilePath',
-                                      )
-                                    : null,
-                                child: profilePath == null
-                                    ? Text(
-                                        member['name'][0],
-                                        style: TextStyle(
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.onSurface,
-                                        ),
-                                      )
-                                    : null,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                member['name'],
-                                maxLines: 2,
-                                textAlign: TextAlign.center,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurface,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
+                        return TvCardsWrapper(
+                          onTap: () {},
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            width: 90,
+                            margin: const EdgeInsets.only(right: 16),
+                            child: Column(
+                              children: [
+                                CircleAvatar(
+                                  radius: 35,
+                                  backgroundColor: Colors.grey[800],
+                                  backgroundImage: profilePath != null
+                                      ? CachedNetworkImageProvider(
+                                          '${TmdbConfig.imageBaseUrl}$profilePath',
+                                        )
+                                      : null,
+                                  child: profilePath == null
+                                      ? Text(
+                                          member['name'][0],
+                                          style: TextStyle(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurface,
+                                          ),
+                                        )
+                                      : null,
                                 ),
-                              ),
-                              Text(
-                                member['character'] ?? '',
-                                maxLines: 1,
-                                textAlign: TextAlign.center,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurface.withOpacity(0.6),
-                                  fontSize: 11,
+                                const SizedBox(height: 8),
+                                Text(
+                                  member['name'],
+                                  maxLines: 2,
+                                  textAlign: TextAlign.center,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              ),
-                            ],
+                                Text(
+                                  member['character'] ?? '',
+                                  maxLines: 1,
+                                  textAlign: TextAlign.center,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface.withOpacity(0.6),
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         );
                       },
@@ -1560,6 +1601,7 @@ class _TmdbMovieDetailsScreenState
                   SizedBox(
                     height: 50,
                     child: ListView.builder(
+                      clipBehavior: Clip.none,
                       scrollDirection: Axis.horizontal,
                       itemCount: productionCompanies.length,
                       itemBuilder: (context, index) {
@@ -1637,6 +1679,7 @@ class _TmdbMovieDetailsScreenState
                   SizedBox(
                     height: 150,
                     child: ListView.builder(
+                      clipBehavior: Clip.none,
                       scrollDirection: Axis.horizontal,
                       itemCount: videos.length,
                       itemBuilder: (context, index) {
@@ -1644,7 +1687,7 @@ class _TmdbMovieDetailsScreenState
                         final videoKey = video['key'];
                         final thumbUrl =
                             'https://img.youtube.com/vi/$videoKey/0.jpg';
-                        return GestureDetector(
+                        return TvCardsWrapper(
                           onTap: () async {
                             final uri = Uri.parse(
                               'https://www.youtube.com/watch?v=$videoKey',
@@ -1726,6 +1769,7 @@ class _TmdbMovieDetailsScreenState
                   SizedBox(
                     height: 180,
                     child: ListView.separated(
+                      clipBehavior: Clip.none,
                       scrollDirection: Axis.horizontal,
                       itemCount: (data['seasons'] as List).length,
                       separatorBuilder: (_, __) => const SizedBox(width: 12),
@@ -1735,7 +1779,7 @@ class _TmdbMovieDetailsScreenState
                         final seasonNum = season['season_number'];
                         final isSelected = _selectedSeason == seasonNum;
 
-                        return GestureDetector(
+                        return TvCardsWrapper(
                           onTap: () => _fetchEpisodes(seasonNum),
                           child: Container(
                             width: 120,
@@ -1850,7 +1894,7 @@ class _TmdbMovieDetailsScreenState
                                     ? '${hours}h ${minutes}m'
                                     : '${minutes}m';
 
-                                return GestureDetector(
+                                return TvCardsWrapper(
                                   onTap: () {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
@@ -1869,6 +1913,7 @@ class _TmdbMovieDetailsScreenState
                                       ),
                                     );
                                   },
+                                  borderRadius: BorderRadius.circular(8),
                                   child: Container(
                                     padding: const EdgeInsets.only(bottom: 8),
                                     child: Row(
