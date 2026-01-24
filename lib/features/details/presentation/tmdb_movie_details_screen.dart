@@ -72,7 +72,7 @@ class _TmdbMovieDetailsScreenState
   Future<Map<String, dynamic>?>? _episodesFuture;
   late final ScrollController _castScrollController;
   late final ScrollController _trailerScrollController;
-  late final ScrollController _recoScrollController;
+
   late final ScrollController _episodeScrollController;
 
   @override
@@ -81,7 +81,7 @@ class _TmdbMovieDetailsScreenState
     _scrollController = ScrollController();
     _castScrollController = ScrollController();
     _trailerScrollController = ScrollController();
-    _recoScrollController = ScrollController();
+
     _episodeScrollController = ScrollController();
     _scrollController.addListener(_onScroll);
     if (widget.mediaType == 'tv') {
@@ -110,7 +110,7 @@ class _TmdbMovieDetailsScreenState
     _scrollController.dispose();
     _castScrollController.dispose();
     _trailerScrollController.dispose();
-    _recoScrollController.dispose();
+
     _episodeScrollController.dispose();
     _showAppBarTitle.dispose();
     super.dispose();
@@ -239,9 +239,6 @@ class _TmdbMovieDetailsScreenState
         : [];
     final credits = data['credits'] ?? {};
     final cast = List<Map<String, dynamic>>.from(credits['cast'] ?? []);
-    final recommendations = List<Map<String, dynamic>>.from(
-      data['recommendations'] != null ? data['recommendations']['results'] : [],
-    );
 
     // Find Director / Creator
     String director = "Unknown";
@@ -287,6 +284,18 @@ class _TmdbMovieDetailsScreenState
 
     return Scaffold(
       backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => Navigator.of(context).pop(),
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.black45,
+            foregroundColor: Colors.white,
+          ),
+        ),
+      ),
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -731,76 +740,6 @@ class _TmdbMovieDetailsScreenState
                     const SizedBox(height: 50),
                   ],
 
-                  // 4. More Like This
-                  if (recommendations.isNotEmpty) ...[
-                    const Text(
-                      "More Like This",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      height: 200,
-                      child: DesktopScrollWrapper(
-                        controller: _recoScrollController,
-                        child: ListView.separated(
-                          controller: _recoScrollController,
-                          scrollDirection: Axis.horizontal,
-                          itemCount: recommendations.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(width: 16),
-                          itemBuilder: (context, index) {
-                            final r = recommendations[index];
-                            final poster = r['poster_path'];
-                            return GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => TmdbMovieDetailsScreen(
-                                      movieId: r['id'],
-                                      mediaType: isMovie ? 'movie' : 'tv',
-                                    ),
-                                  ),
-                                );
-                              },
-                              child: AspectRatio(
-                                aspectRatio: 2 / 3,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(8),
-                                    image: poster != null
-                                        ? DecorationImage(
-                                            image: NetworkImage(
-                                              '${TmdbConfig.imageBaseUrl}$poster',
-                                            ),
-                                            fit: BoxFit.cover,
-                                          )
-                                        : null,
-                                    color: Colors.grey[800],
-                                    border: Border.all(color: Colors.white10),
-                                  ),
-                                  child: poster == null
-                                      ? const Center(
-                                          child: Icon(
-                                            Icons.movie,
-                                            color: Colors.white24,
-                                          ),
-                                        )
-                                      : null,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 50),
-                  ],
-
                   // 5. Details (Production, Status)
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -877,20 +816,6 @@ class _TmdbMovieDetailsScreenState
 
                   const SizedBox(height: 100),
                 ],
-              ),
-            ),
-          ),
-
-          // 3. Back Button Pinned
-          Positioned(
-            top: 40,
-            left: 20,
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back_rounded),
-              onPressed: () => Navigator.pop(context),
-              style: IconButton.styleFrom(
-                backgroundColor: Colors.black45,
-                foregroundColor: Colors.white,
               ),
             ),
           ),

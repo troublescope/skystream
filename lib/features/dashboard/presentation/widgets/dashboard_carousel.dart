@@ -294,22 +294,26 @@ class _DashboardCarouselState extends State<DashboardCarousel> {
                                 size: 16,
                               ),
                               const SizedBox(width: 6),
-                              Text(
-                                metadata,
-                                style: TextStyle(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurface,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  shadows: [
-                                    if (Theme.of(context).brightness ==
-                                        Brightness.dark)
-                                      const Shadow(
-                                        color: Colors.black,
-                                        blurRadius: 4,
-                                      ),
-                                  ],
+                              Flexible(
+                                child: Text(
+                                  metadata,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    shadows: [
+                                      if (Theme.of(context).brightness ==
+                                          Brightness.dark)
+                                        const Shadow(
+                                          color: Colors.black,
+                                          blurRadius: 4,
+                                        ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ],
