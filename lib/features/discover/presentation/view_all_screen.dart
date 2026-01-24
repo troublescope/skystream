@@ -5,7 +5,7 @@ import '../../../../core/config/tmdb_config.dart';
 import '../../details/presentation/tmdb_movie_details_screen.dart';
 import '../../../../shared/widgets/tv_cards_wrapper.dart';
 import '../../../../shared/widgets/shimmer_placeholder.dart';
-import '../../dashboard/data/tmdb_provider.dart';
+import '../data/tmdb_provider.dart';
 
 enum ViewAllCategory {
   popularMovies,

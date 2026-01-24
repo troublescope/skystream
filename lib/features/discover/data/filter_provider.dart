@@ -38,10 +38,12 @@ class FilterNotifier extends Notifier<FilterState> {
   void setRating(double? rating) {
     state = state.copyWith(minRating: rating, clearRating: rating == null);
   }
-  
+
   void clearAll() {
     state = const FilterState();
   }
 }
 
-final dashboardFilterProvider = NotifierProvider<FilterNotifier, FilterState>(() => FilterNotifier());
+final discoverFilterProvider = NotifierProvider<FilterNotifier, FilterState>(
+  () => FilterNotifier(),
+);

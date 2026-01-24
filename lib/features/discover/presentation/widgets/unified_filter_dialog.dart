@@ -120,7 +120,7 @@ class _UnifiedFilterDialogState extends ConsumerState<UnifiedFilterDialog>
                           builder: (c, ref, _) {
                             final hasFilter =
                                 ref
-                                    .watch(dashboardFilterProvider)
+                                    .watch(discoverFilterProvider)
                                     .selectedGenre !=
                                 null;
                             return Tab(
@@ -153,7 +153,7 @@ class _UnifiedFilterDialogState extends ConsumerState<UnifiedFilterDialog>
                           builder: (c, ref, _) {
                             final hasFilter =
                                 ref
-                                    .watch(dashboardFilterProvider)
+                                    .watch(discoverFilterProvider)
                                     .selectedYear !=
                                 null;
                             return Tab(
@@ -185,7 +185,7 @@ class _UnifiedFilterDialogState extends ConsumerState<UnifiedFilterDialog>
                         Consumer(
                           builder: (c, ref, _) {
                             final hasFilter =
-                                ref.watch(dashboardFilterProvider).minRating !=
+                                ref.watch(discoverFilterProvider).minRating !=
                                 null;
                             return Tab(
                               text: "Rating",
@@ -270,7 +270,7 @@ class _RatingTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final selectedRating = ref.watch(dashboardFilterProvider).minRating;
+    final selectedRating = ref.watch(discoverFilterProvider).minRating;
 
     final ratings = [null, 5.0, 6.0, 7.0, 8.0, 9.0];
 
@@ -288,7 +288,7 @@ class _RatingTab extends ConsumerWidget {
 
         return ListTile(
           onTap: () {
-            ref.read(dashboardFilterProvider.notifier).setRating(rating);
+            ref.read(discoverFilterProvider.notifier).setRating(rating);
           },
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -440,7 +440,7 @@ class _GenreTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final genresAsync = ref.watch(genresProvider);
-    final selectedGenre = ref.watch(dashboardFilterProvider).selectedGenre;
+    final selectedGenre = ref.watch(discoverFilterProvider).selectedGenre;
 
     return genresAsync.when(
       data: (genres) => ListView.builder(
@@ -452,7 +452,7 @@ class _GenreTab extends ConsumerWidget {
             final isSelected = selectedGenre == null;
             return ListTile(
               onTap: () {
-                ref.read(dashboardFilterProvider.notifier).setGenre(null);
+                ref.read(discoverFilterProvider.notifier).setGenre(null);
               },
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -481,7 +481,7 @@ class _GenreTab extends ConsumerWidget {
               selectedGenre != null && selectedGenre['id'] == genre['id'];
           return ListTile(
             onTap: () {
-              ref.read(dashboardFilterProvider.notifier).setGenre(genre);
+              ref.read(discoverFilterProvider.notifier).setGenre(genre);
             },
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -521,7 +521,7 @@ class _YearTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final selectedYear = ref.watch(dashboardFilterProvider).selectedYear;
+    final selectedYear = ref.watch(discoverFilterProvider).selectedYear;
     final currentYear = DateTime.now().year;
     final years = List.generate(50, (index) => currentYear - index);
 
@@ -540,7 +540,7 @@ class _YearTab extends ConsumerWidget {
           final isSelected = selectedYear == null;
           return InkWell(
             onTap: () {
-              ref.read(dashboardFilterProvider.notifier).setYear(null);
+              ref.read(discoverFilterProvider.notifier).setYear(null);
             },
             borderRadius: BorderRadius.circular(8),
             child: Container(
@@ -575,7 +575,7 @@ class _YearTab extends ConsumerWidget {
 
         return InkWell(
           onTap: () {
-            ref.read(dashboardFilterProvider.notifier).setYear(year);
+            ref.read(discoverFilterProvider.notifier).setYear(year);
           },
           borderRadius: BorderRadius.circular(8),
           child: Container(

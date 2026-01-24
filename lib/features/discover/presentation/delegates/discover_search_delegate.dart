@@ -6,12 +6,12 @@ import 'dart:async';
 import '../../../../core/config/tmdb_config.dart';
 import '../../../../shared/widgets/shimmer_placeholder.dart';
 import '../../../details/presentation/tmdb_movie_details_screen.dart';
-import '../../../dashboard/data/tmdb_provider.dart';
+import '../../data/tmdb_provider.dart';
 
-class DashboardSearchDelegate extends SearchDelegate {
+class DiscoverSearchDelegate extends SearchDelegate {
   final WidgetRef ref;
 
-  DashboardSearchDelegate(this.ref)
+  DiscoverSearchDelegate(this.ref)
     : super(
         searchFieldLabel: 'Search movies, tv shows...',
         searchFieldStyle: const TextStyle(color: Colors.white70, fontSize: 18),

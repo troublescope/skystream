@@ -7,21 +7,23 @@ import '../../../details/presentation/tmdb_movie_details_screen.dart';
 import '../../../../shared/widgets/tv_cards_wrapper.dart'; // Import TvCardsWrapper
 import '../../../../shared/widgets/shimmer_placeholder.dart';
 
-class DashboardCarousel extends StatefulWidget {
+class DiscoverCarousel extends StatefulWidget {
   final List<Map<String, dynamic>> movies;
   final ScrollController? scrollController;
+  final void Function(Map<String, dynamic>)? onTap;
 
-  const DashboardCarousel({
+  const DiscoverCarousel({
     super.key,
     required this.movies,
     this.scrollController,
+    this.onTap,
   });
 
   @override
-  State<DashboardCarousel> createState() => _DashboardCarouselState();
+  State<DiscoverCarousel> createState() => _DiscoverCarouselState();
 }
 
-class _DashboardCarouselState extends State<DashboardCarousel> {
+class _DiscoverCarouselState extends State<DiscoverCarousel> {
   int _currentIndex = 0;
   final CarouselSliderController _carouselController =
       CarouselSliderController();
@@ -180,9 +182,16 @@ class _DashboardCarouselState extends State<DashboardCarousel> {
   ) {
     final posterPath = movie['poster_path'];
     final backdropPath = movie['backdrop_path'] ?? posterPath;
-    final imageUrl = backdropPath != null
-        ? '${TmdbConfig.backdropSizeUrl}$backdropPath'
-        : 'https://via.placeholder.com/500x750';
+    String imageUrl;
+    if (backdropPath != null) {
+      if (backdropPath.startsWith('http')) {
+        imageUrl = backdropPath;
+      } else {
+        imageUrl = '${TmdbConfig.backdropSizeUrl}$backdropPath';
+      }
+    } else {
+      imageUrl = 'https://via.placeholder.com/500x750';
+    }
 
     final title = movie['title'] ?? movie['name'] ?? 'Unknown';
     final logoUrl = movie['logo_url'];
@@ -215,7 +224,13 @@ class _DashboardCarouselState extends State<DashboardCarousel> {
     }
 
     return TvCardsWrapper(
-      onTap: () => _navigateToDetails(context, movie),
+      onTap: () {
+        if (widget.onTap != null) {
+          widget.onTap!(movie);
+        } else {
+          _navigateToDetails(context, movie);
+        }
+      },
       borderRadius: BorderRadius.zero,
       child: AnimatedBuilder(
         animation: widget.scrollController!,
@@ -414,7 +429,14 @@ class _DashboardCarouselState extends State<DashboardCarousel> {
     Map<String, dynamic> movie,
   ) {
     return TvCardsWrapper(
-      onTap: () => _navigateToDetails(context, movie),
+      onTap: () {
+        if (widget.onTap != null) {
+          // Need to access widget.onTap but this method is in state, so it works.
+          widget.onTap!(movie);
+        } else {
+          _navigateToDetails(context, movie);
+        }
+      },
       borderRadius: BorderRadius.zero,
       child: Stack(
         fit: StackFit.expand,

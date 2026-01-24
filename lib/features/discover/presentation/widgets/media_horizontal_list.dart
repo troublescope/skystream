@@ -11,12 +11,18 @@ class MediaHorizontalList extends StatefulWidget {
   final String title;
   final List<Map<String, dynamic>> mediaList;
   final ViewAllCategory category;
+  final void Function(Map<String, dynamic>)? onTap;
+  final bool showViewAll;
+  final String? heroTagPrefix;
 
   const MediaHorizontalList({
     super.key,
     required this.title,
     required this.mediaList,
     required this.category,
+    this.onTap,
+    this.showViewAll = true,
+    this.heroTagPrefix,
   });
 
   @override
@@ -45,7 +51,7 @@ class _MediaHorizontalListState extends State<MediaHorizontalList> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth > 800;
     final cardWidth = isDesktop ? 200.0 : 130.0;
-    final listHeight = isDesktop ? 350.0 : 200.0;
+    final listHeight = isDesktop ? 350.0 : 230.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -57,79 +63,84 @@ class _MediaHorizontalListState extends State<MediaHorizontalList> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               // Title with Blue Underline Accent
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    widget.title,
-                    style: TextStyle(
-                      fontSize: isDesktop ? 24 : 20,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Container(
-                    width: isDesktop ? 30 : 20, // Accent width
-                    height: 3,
-                    decoration: BoxDecoration(
-                      color: Colors.blueAccent, // Nuvio blue
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ],
-              ),
-
-              // View All Button (Dark Pill)
-              TvCardsWrapper(
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => ViewAllScreen(
-                        title: widget.title,
-                        initialMediaList: widget.mediaList,
-                        category: widget.category,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      widget.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: isDesktop ? 24 : 20,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
-                  );
-                },
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    children: [
-                      Text(
-                        "View All",
-                        style: TextStyle(
+                    const SizedBox(height: 4),
+                    Container(
+                      width: isDesktop ? 30 : 20, // Accent width
+                      height: 3,
+                      decoration: BoxDecoration(
+                        color: Colors.blueAccent, // Nuvio blue
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (widget.showViewAll) const SizedBox(width: 8),
+
+              if (widget.showViewAll)
+                TvCardsWrapper(
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => ViewAllScreen(
+                          title: widget.title,
+                          initialMediaList: widget.mediaList,
+                          category: widget.category,
+                        ),
+                      ),
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          "View All",
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withOpacity(0.7),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.arrow_forward_ios,
+                          size: 10,
                           color: Theme.of(
                             context,
                           ).colorScheme.onSurface.withOpacity(0.7),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
                         ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        Icons.arrow_forward_ios,
-                        size: 10,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withOpacity(0.7),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
@@ -151,28 +162,40 @@ class _MediaHorizontalListState extends State<MediaHorizontalList> {
               itemBuilder: (context, index) {
                 final item = widget.mediaList[index];
                 final posterPath = item['poster_path'];
-                final imageUrl = posterPath != null
-                    ? '${TmdbConfig.posterSizeUrl}$posterPath'
-                    : 'https://via.placeholder.com/150x225';
+                String imageUrl;
+                if (posterPath != null) {
+                  if (posterPath.startsWith('http')) {
+                    imageUrl = posterPath;
+                  } else {
+                    imageUrl = '${TmdbConfig.posterSizeUrl}$posterPath';
+                  }
+                } else {
+                  imageUrl = 'https://via.placeholder.com/150x225';
+                }
                 final itemTitle = item['title'] ?? item['name'] ?? 'Unknown';
+                final prefix = widget.heroTagPrefix ?? 'list';
                 final uniqueTag =
-                    'list_${widget.title}_${item['id']}_${itemTitle.hashCode}';
+                    '${prefix}_${widget.title}_${item['id']}_${itemTitle.hashCode}_$index';
                 final mediaType =
                     item['media_type'] ??
                     (item['title'] != null ? 'movie' : 'tv');
 
                 return TvCardsWrapper(
                   onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => TmdbMovieDetailsScreen(
-                          movieId: item['id'],
-                          mediaType: mediaType,
-                          heroTag: uniqueTag,
-                          placeholderPoster: imageUrl,
+                    if (widget.onTap != null) {
+                      widget.onTap!(item);
+                    } else {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => TmdbMovieDetailsScreen(
+                            movieId: item['id'],
+                            mediaType: mediaType,
+                            heroTag: uniqueTag,
+                            placeholderPoster: imageUrl,
+                          ),
                         ),
-                      ),
-                    );
+                      );
+                    }
                   },
                   child: SizedBox(
                     width: cardWidth, // Fixed width for poster

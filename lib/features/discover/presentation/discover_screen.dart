@@ -3,22 +3,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/tmdb_provider.dart';
 import 'view_all_screen.dart'; // Import ViewAllScreen/Category
-import 'widgets/dashboard_carousel.dart';
+import 'widgets/discover_carousel.dart';
 import 'widgets/media_horizontal_list.dart';
 import 'widgets/unified_filter_dialog.dart';
 import '../../../shared/widgets/tv_cards_wrapper.dart'; // Import TvCardsWrapper
 import '../data/filter_provider.dart';
-import 'delegates/dashboard_search_delegate.dart';
+import 'delegates/discover_search_delegate.dart';
 import '../../../../shared/widgets/shimmer_placeholder.dart';
 
-class DashboardScreen extends ConsumerStatefulWidget {
-  const DashboardScreen({super.key});
+class DiscoverScreen extends ConsumerStatefulWidget {
+  const DiscoverScreen({super.key});
 
   @override
-  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
+  ConsumerState<DiscoverScreen> createState() => _DiscoverScreenState();
 }
 
-class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   late ScrollController _scrollController;
   final ValueNotifier<bool> _isScrolledNotifier = ValueNotifier<bool>(false);
 
@@ -48,7 +48,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final heroMovieAsync = ref.watch(dashboardHeroMovieProvider);
+    final heroMovieAsync = ref.watch(discoverHeroMovieProvider); // Updated
     final popularMoviesAsync = ref.watch(popularMoviesProvider);
     final popularTVAsync = ref.watch(popularTVProvider);
     final nowPlayingAsync = ref.watch(nowPlayingMoviesProvider);
@@ -114,7 +114,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   borderRadius: BorderRadius.circular(50),
                   child: Consumer(
                     builder: (context, ref, _) {
-                      final filters = ref.watch(dashboardFilterProvider);
+                      final filters = ref.watch(
+                        discoverFilterProvider,
+                      ); // Updated
                       // Language exclusion: Only highlight for content filters
                       final hasActiveFilter =
                           filters.selectedGenre != null ||
@@ -145,7 +147,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   onTap: () {
                     showSearch(
                       context: context,
-                      delegate: DashboardSearchDelegate(ref),
+                      delegate: DiscoverSearchDelegate(ref), // Updated
                     );
                   },
                   borderRadius: BorderRadius.circular(50),
@@ -171,7 +173,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 child: heroMovieAsync.when(
                   data: (movies) {
                     if (movies.isEmpty) return const SizedBox.shrink();
-                    return DashboardCarousel(
+                    return DiscoverCarousel(
+                      // Updated
                       movies: movies,
                       scrollController: _scrollController,
                     );
@@ -267,6 +270,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           title: title,
           mediaList: items,
           category: category,
+          heroTagPrefix: 'discover',
         );
       },
       loading: () => Padding(

@@ -18,7 +18,7 @@ final trendingMoviesProvider = FutureProvider<List<Map<String, dynamic>>>((
 ) async {
   final service = ref.watch(tmdbServiceProvider);
   final lang = ref.watch(languageProvider);
-  final filters = ref.watch(dashboardFilterProvider);
+  final filters = ref.watch(discoverFilterProvider);
   return service.getTrending(
     language: lang,
     genreId: filters.selectedGenre?['id'],
@@ -32,7 +32,7 @@ final popularMoviesProvider = FutureProvider<List<Map<String, dynamic>>>((
 ) async {
   final service = ref.watch(tmdbServiceProvider);
   final lang = ref.watch(languageProvider);
-  final filters = ref.watch(dashboardFilterProvider);
+  final filters = ref.watch(discoverFilterProvider);
   return service.getPopularMovies(
     language: lang,
     genreId: filters.selectedGenre?['id'],
@@ -46,7 +46,7 @@ final nowPlayingMoviesProvider = FutureProvider<List<Map<String, dynamic>>>((
 ) async {
   final service = ref.watch(tmdbServiceProvider);
   final lang = ref.watch(languageProvider);
-  final filters = ref.watch(dashboardFilterProvider);
+  final filters = ref.watch(discoverFilterProvider);
   return service.getNowPlayingMovies(
     language: lang,
     genreId: filters.selectedGenre?['id'],
@@ -60,7 +60,7 @@ final topRatedMoviesProvider = FutureProvider<List<Map<String, dynamic>>>((
 ) async {
   final service = ref.watch(tmdbServiceProvider);
   final lang = ref.watch(languageProvider);
-  final filters = ref.watch(dashboardFilterProvider);
+  final filters = ref.watch(discoverFilterProvider);
   return service.getTopRated(
     language: lang,
     genreId: filters.selectedGenre?['id'],
@@ -74,7 +74,7 @@ final popularTVProvider = FutureProvider<List<Map<String, dynamic>>>((
 ) async {
   final service = ref.watch(tmdbServiceProvider);
   final lang = ref.watch(languageProvider);
-  final filters = ref.watch(dashboardFilterProvider);
+  final filters = ref.watch(discoverFilterProvider);
   return service.getPopularTV(
     language: lang,
     genreId: filters.selectedGenre?['id'],
@@ -88,7 +88,7 @@ final topRatedTVProvider = FutureProvider<List<Map<String, dynamic>>>((
 ) async {
   final service = ref.watch(tmdbServiceProvider);
   final lang = ref.watch(languageProvider);
-  final filters = ref.watch(dashboardFilterProvider);
+  final filters = ref.watch(discoverFilterProvider);
   return service.getTopRatedTV(
     language: lang,
     genreId: filters.selectedGenre?['id'],
@@ -102,7 +102,7 @@ final onTheAirTVProvider = FutureProvider<List<Map<String, dynamic>>>((
 ) async {
   final service = ref.watch(tmdbServiceProvider);
   final lang = ref.watch(languageProvider);
-  final filters = ref.watch(dashboardFilterProvider);
+  final filters = ref.watch(discoverFilterProvider);
   return service.getOnTheAirTV(
     language: lang,
     genreId: filters.selectedGenre?['id'],
@@ -116,7 +116,7 @@ final airingTodayTVProvider = FutureProvider<List<Map<String, dynamic>>>((
 ) async {
   final service = ref.watch(tmdbServiceProvider);
   final lang = ref.watch(languageProvider);
-  final filters = ref.watch(dashboardFilterProvider);
+  final filters = ref.watch(discoverFilterProvider);
   return service.getAiringTodayTV(
     language: lang,
     genreId: filters.selectedGenre?['id'],
@@ -125,12 +125,12 @@ final airingTodayTVProvider = FutureProvider<List<Map<String, dynamic>>>((
   );
 });
 
-final dashboardHeroMovieProvider = FutureProvider<List<Map<String, dynamic>>>((
+final discoverHeroMovieProvider = FutureProvider<List<Map<String, dynamic>>>((
   ref,
 ) async {
   final service = ref.watch(tmdbServiceProvider);
   final lang = ref.watch(languageProvider);
-  final filters = ref.watch(dashboardFilterProvider);
+  final filters = ref.watch(discoverFilterProvider);
   final trending = await service.getTrendingAllDay(
     language: lang,
     genreId: filters.selectedGenre?['id'],

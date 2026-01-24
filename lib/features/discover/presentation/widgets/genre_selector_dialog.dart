@@ -10,7 +10,7 @@ class GenreSelectorDialog extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final genresAsync = ref.watch(genresProvider);
-    final selectedGenre = ref.watch(dashboardFilterProvider).selectedGenre;
+    final selectedGenre = ref.watch(discoverFilterProvider).selectedGenre;
 
     return BackdropFilter(
       filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
@@ -29,7 +29,7 @@ class GenreSelectorDialog extends ConsumerWidget {
                 color: Colors.black.withOpacity(0.5),
                 blurRadius: 20,
                 offset: const Offset(0, 10),
-              )
+              ),
             ],
           ),
           child: Column(
@@ -39,21 +39,34 @@ class GenreSelectorDialog extends ConsumerWidget {
                 padding: const EdgeInsets.all(24.0),
                 child: Row(
                   children: [
-                    const Icon(Icons.category_outlined, color: Colors.blueAccent, size: 28),
+                    const Icon(
+                      Icons.category_outlined,
+                      color: Colors.blueAccent,
+                      size: 28,
+                    ),
                     const SizedBox(width: 12),
                     const Text(
                       "Select Genre",
-                      style: TextStyle( color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const Spacer(),
                     // Clear button
                     if (selectedGenre != null)
                       TextButton(
                         onPressed: () {
-                           ref.read(dashboardFilterProvider.notifier).setGenre(null);
-                           Navigator.of(context).pop();
+                          ref
+                              .read(discoverFilterProvider.notifier)
+                              .setGenre(null);
+                          Navigator.of(context).pop();
                         },
-                        child: const Text("Clear", style: TextStyle(color: Colors.redAccent)),
+                        child: const Text(
+                          "Clear",
+                          style: TextStyle(color: Colors.redAccent),
+                        ),
                       ),
                   ],
                 ),
@@ -66,30 +79,50 @@ class GenreSelectorDialog extends ConsumerWidget {
                     itemCount: genres.length,
                     itemBuilder: (context, index) {
                       final genre = genres[index];
-                      final isSelected = selectedGenre != null && selectedGenre['id'] == genre['id'];
+                      final isSelected =
+                          selectedGenre != null &&
+                          selectedGenre['id'] == genre['id'];
                       return ListTile(
                         onTap: () {
-                           ref.read(dashboardFilterProvider.notifier).setGenre(genre);
-                           Navigator.of(context).pop();
+                          ref
+                              .read(discoverFilterProvider.notifier)
+                              .setGenre(genre);
+                          Navigator.of(context).pop();
                         },
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        tileColor: isSelected ? Colors.blueAccent.withOpacity(0.2) : null,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        tileColor: isSelected
+                            ? Colors.blueAccent.withOpacity(0.2)
+                            : null,
                         leading: Icon(
-                          isSelected ? Icons.check_circle : Icons.circle_outlined,
-                          color: isSelected ? Colors.blueAccent : Colors.white24,
+                          isSelected
+                              ? Icons.check_circle
+                              : Icons.circle_outlined,
+                          color: isSelected
+                              ? Colors.blueAccent
+                              : Colors.white24,
                         ),
                         title: Text(
                           genre['name'],
                           style: TextStyle(
                             color: isSelected ? Colors.white : Colors.white70,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
                           ),
                         ),
                       );
                     },
                   ),
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (_, __) => const Center(child: Text("Failed to load genres", style: TextStyle(color: Colors.white))),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (_, __) => const Center(
+                    child: Text(
+                      "Failed to load genres",
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
                 ),
               ),
             ],

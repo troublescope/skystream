@@ -6,8 +6,8 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/config/tmdb_config.dart';
 import '../../../core/services/tmdb_service.dart';
-import '../../dashboard/data/tmdb_provider.dart';
-import '../../dashboard/data/language_provider.dart';
+import '../../discover/data/tmdb_provider.dart';
+import '../../discover/data/language_provider.dart';
 import 'widgets/provider_search_section.dart';
 import '../../../shared/widgets/desktop_scroll_wrapper.dart';
 import '../../../shared/widgets/tv_cards_wrapper.dart'; // Import TvCardsWrapper

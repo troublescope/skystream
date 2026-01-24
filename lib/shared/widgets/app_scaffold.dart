@@ -15,9 +15,9 @@ class AppScaffold extends ConsumerStatefulWidget {
 class _AppScaffoldState extends ConsumerState<AppScaffold> {
   int _calculateSelectedIndex(BuildContext context) {
     final String location = GoRouterState.of(context).uri.toString();
-    if (location.startsWith('/dashboard')) return 0;
-    if (location.startsWith('/home')) return 1;
-    if (location.startsWith('/search')) return 2;
+    if (location.startsWith('/home')) return 0;
+    if (location.startsWith('/search')) return 1;
+    if (location.startsWith('/discover')) return 2;
     if (location.startsWith('/library')) return 3;
     if (location.startsWith('/settings')) return 4;
     return 0;
@@ -26,13 +26,13 @@ class _AppScaffoldState extends ConsumerState<AppScaffold> {
   void _onItemTapped(int index, BuildContext context) {
     switch (index) {
       case 0:
-        context.go('/dashboard');
-        break;
-      case 1:
         context.go('/home');
         break;
-      case 2:
+      case 1:
         context.go('/search');
+        break;
+      case 2:
+        context.go('/discover');
         break;
       case 3:
         context.go('/library');
@@ -56,15 +56,11 @@ class _AppScaffoldState extends ConsumerState<AppScaffold> {
               children: [
                 NavigationRail(
                   selectedIndex: _calculateSelectedIndex(context),
-                  onDestinationSelected: (index) => _onItemTapped(index, context),
+                  onDestinationSelected: (index) =>
+                      _onItemTapped(index, context),
                   labelType: NavigationRailLabelType.all,
                   groupAlignment: 0.0, // Center
                   destinations: const [
-                    NavigationRailDestination(
-                      icon: Icon(Icons.dashboard_outlined),
-                      selectedIcon: Icon(Icons.dashboard),
-                      label: Text('Dashboard'),
-                    ),
                     NavigationRailDestination(
                       icon: Icon(Icons.home_outlined),
                       selectedIcon: Icon(Icons.home),
@@ -73,6 +69,11 @@ class _AppScaffoldState extends ConsumerState<AppScaffold> {
                     NavigationRailDestination(
                       icon: Icon(Icons.search),
                       label: Text('Search'),
+                    ),
+                    NavigationRailDestination(
+                      icon: Icon(Icons.dashboard_outlined),
+                      selectedIcon: Icon(Icons.dashboard),
+                      label: Text('Discover'),
                     ),
                     NavigationRailDestination(
                       icon: Icon(Icons.library_books_outlined),
@@ -87,9 +88,7 @@ class _AppScaffoldState extends ConsumerState<AppScaffold> {
                   ],
                 ),
                 const VerticalDivider(thickness: 1, width: 1),
-                Expanded(
-                  child: widget.child,
-                ),
+                Expanded(child: widget.child),
               ],
             ),
           );
@@ -104,7 +103,8 @@ class _AppScaffoldState extends ConsumerState<AppScaffold> {
           ),
         );
       },
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (err, stack) => Scaffold(body: Center(child: Text('Error: $err'))),
     );
   }

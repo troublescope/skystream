@@ -21,27 +21,40 @@ class ContinueWatchingSection extends ConsumerWidget {
     final device = ref.watch(deviceProfileProvider).asData?.value;
     final isLarge = device?.isLargeScreen ?? false;
 
-    final double width = isLarge ? 170 : 110;
-    final double posterHeight = width * 1.5;
-    final double totalHeight = posterHeight + 100;
+    final double width = isLarge ? 360.0 : 280.0;
+    final double listHeight = isLarge ? 200.0 : 150.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Text(
-            title,
-            style: isLarge
-                ? Theme.of(context)
-                    .textTheme
-                    .headlineSmall
-                    ?.copyWith(fontWeight: FontWeight.bold)
-                : Theme.of(context).textTheme.titleLarge,
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: isLarge ? 24 : 20,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                width: isLarge ? 30 : 20,
+                height: 3,
+                decoration: BoxDecoration(
+                  color: Colors.blueAccent,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ],
           ),
         ),
         SizedBox(
-          height: totalHeight,
+          height: listHeight,
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             scrollDirection: Axis.horizontal,

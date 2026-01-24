@@ -8,9 +8,12 @@ class YearSelectorDialog extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final selectedYear = ref.watch(dashboardFilterProvider).selectedYear;
+    final selectedYear = ref.watch(discoverFilterProvider).selectedYear;
     final currentYear = DateTime.now().year;
-    final years = List.generate(50, (index) => currentYear - index); // 50 years back
+    final years = List.generate(
+      50,
+      (index) => currentYear - index,
+    ); // 50 years back
 
     return BackdropFilter(
       filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
@@ -25,7 +28,11 @@ class YearSelectorDialog extends ConsumerWidget {
             borderRadius: BorderRadius.circular(24),
             border: Border.all(color: Colors.white12, width: 1),
             boxShadow: [
-               BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 20, offset: const Offset(0, 10))
+              BoxShadow(
+                color: Colors.black.withOpacity(0.5),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
             ],
           ),
           child: Column(
@@ -35,20 +42,33 @@ class YearSelectorDialog extends ConsumerWidget {
                 padding: const EdgeInsets.all(24.0),
                 child: Row(
                   children: [
-                    const Icon(Icons.calendar_today, color: Colors.blueAccent, size: 28),
+                    const Icon(
+                      Icons.calendar_today,
+                      color: Colors.blueAccent,
+                      size: 28,
+                    ),
                     const SizedBox(width: 12),
                     const Text(
                       "Select Year",
-                      style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const Spacer(),
                     if (selectedYear != null)
                       TextButton(
                         onPressed: () {
-                           ref.read(dashboardFilterProvider.notifier).setYear(null);
-                           Navigator.of(context).pop();
+                          ref
+                              .read(discoverFilterProvider.notifier)
+                              .setYear(null);
+                          Navigator.of(context).pop();
                         },
-                        child: const Text("Clear", style: TextStyle(color: Colors.redAccent)),
+                        child: const Text(
+                          "Clear",
+                          style: TextStyle(color: Colors.redAccent),
+                        ),
                       ),
                   ],
                 ),
@@ -70,22 +90,30 @@ class YearSelectorDialog extends ConsumerWidget {
 
                     return InkWell(
                       onTap: () {
-                        ref.read(dashboardFilterProvider.notifier).setYear(year);
+                        ref.read(discoverFilterProvider.notifier).setYear(year);
                         Navigator.of(context).pop();
                       },
                       borderRadius: BorderRadius.circular(8),
                       child: Container(
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          color: isSelected ? Colors.blueAccent.withOpacity(0.2) : Colors.white.withOpacity(0.05),
+                          color: isSelected
+                              ? Colors.blueAccent.withOpacity(0.2)
+                              : Colors.white.withOpacity(0.05),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: isSelected ? Colors.blueAccent : Colors.transparent),
+                          border: Border.all(
+                            color: isSelected
+                                ? Colors.blueAccent
+                                : Colors.transparent,
+                          ),
                         ),
                         child: Text(
                           year.toString(),
                           style: TextStyle(
                             color: isSelected ? Colors.white : Colors.white70,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
                             fontSize: 16,
                           ),
                         ),

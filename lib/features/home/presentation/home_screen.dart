@@ -1,15 +1,17 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'home_provider.dart';
 import 'package:skystream/features/home/presentation/widgets/continue_watching_section.dart';
 import 'package:skystream/features/library/presentation/history_provider.dart';
-import 'widgets/home_carousel.dart';
-import 'widgets/home_section.dart';
+import '../../discover/presentation/widgets/discover_carousel.dart';
+import '../../discover/presentation/widgets/media_horizontal_list.dart';
+import '../../discover/presentation/view_all_screen.dart';
 
 import 'package:flutter/rendering.dart';
 import 'package:skystream/core/extensions/extension_manager.dart';
 import 'package:skystream/core/domain/entity/multimedia_item.dart';
-import '../../../../core/extensions/providers/js_based_provider.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -20,6 +22,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final ScrollController _scrollController = ScrollController();
+  final ValueNotifier<bool> _isScrolledNotifier = ValueNotifier<bool>(false);
   bool _isFabExtended = true;
 
   @override
@@ -29,6 +32,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _onScroll() {
+    if (!_scrollController.hasClients) return;
+
+    // Status Bar Logic
+    final isScrolled = _scrollController.offset > 200;
+    if (isScrolled != _isScrolledNotifier.value) {
+      _isScrolledNotifier.value = isScrolled;
+    }
+
+    // FAB Logic
     if (_scrollController.position.userScrollDirection ==
             ScrollDirection.reverse &&
         _isFabExtended) {
@@ -42,7 +54,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    _isScrolledNotifier.dispose();
     super.dispose();
   }
 
@@ -51,94 +65,130 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final homeDataAsync = ref.watch(homeDataProvider);
     final history = ref.watch(watchHistoryProvider);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('SkyStream')),
-      floatingActionButton: Material(
-        elevation: 4,
-        color: Theme.of(context).brightness == Brightness.dark
-            ? Theme.of(context).dialogTheme.backgroundColor
-            : Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () => _showProviderSelector(context, ref),
-          child: Container(
-            height: 56,
-            constraints: const BoxConstraints(minWidth: 56),
-            padding: EdgeInsets.symmetric(horizontal: _isFabExtended ? 16 : 0),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.extension,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                AnimatedSize(
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOut,
-                  child: SizedBox(
-                    width: _isFabExtended ? null : 0,
-                    child: _isFabExtended
-                        ? Padding(
-                            padding: const EdgeInsets.only(left: 12),
-                            child: Builder(
-                              builder: (context) {
-                                final active = ref.watch(
-                                  activeProviderStateProvider,
-                                );
-                                final isDebug = active?.isDebug ?? false;
-                                return Row(
-                                  children: [
-                                    Text(
-                                      active?.name ?? 'None',
-                                      style: TextStyle(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onSurface,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.fade,
-                                      softWrap: false,
-                                    ),
-                                    if (isDebug) ...[
-                                      const SizedBox(width: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 4,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.red,
-                                          borderRadius: BorderRadius.circular(
-                                            4,
-                                          ),
-                                        ),
-                                        child: const Text(
-                                          'DEBUG',
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                );
-                              },
-                            ),
-                          )
-                        : const SizedBox.shrink(),
+    return ValueListenableBuilder<bool>(
+      valueListenable: _isScrolledNotifier,
+      builder: (context, isScrolled, child) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final overlayStyle = isDark
+            ? SystemUiOverlayStyle.light
+            : SystemUiOverlayStyle.dark;
+
+        return Scaffold(
+          extendBodyBehindAppBar: true,
+          appBar: AppBar(
+            systemOverlayStyle: overlayStyle,
+            forceMaterialTransparency: true,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            flexibleSpace: AnimatedBuilder(
+              animation: _scrollController,
+              builder: (context, child) {
+                double offset = 0;
+                if (_scrollController.hasClients) {
+                  offset = _scrollController.offset * 0.8;
+                }
+                // Transition to base background color over 300 pixels
+                final opacity = (offset / 300).clamp(0.0, 1.0);
+
+                return Opacity(
+                  opacity: opacity,
+                  child: Container(
+                    color: Theme.of(context).scaffoldBackgroundColor,
                   ),
+                );
+              },
+            ),
+            title: const Text('SkyStream'),
+          ),
+          floatingActionButton: Material(
+            elevation: 4,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Theme.of(context).dialogTheme.backgroundColor
+                : Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () => _showProviderSelector(context, ref),
+              child: Container(
+                height: 56,
+                constraints: const BoxConstraints(minWidth: 56),
+                padding: EdgeInsets.symmetric(
+                  horizontal: _isFabExtended ? 16 : 0,
                 ),
-              ],
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.extension,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                      child: SizedBox(
+                        width: _isFabExtended ? null : 0,
+                        child: _isFabExtended
+                            ? Padding(
+                                padding: const EdgeInsets.only(left: 12),
+                                child: Builder(
+                                  builder: (context) {
+                                    final active = ref.watch(
+                                      activeProviderStateProvider,
+                                    );
+                                    final isDebug = active?.isDebug ?? false;
+                                    return Row(
+                                      children: [
+                                        Text(
+                                          active?.name ?? 'None',
+                                          style: TextStyle(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurface,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.fade,
+                                          softWrap: false,
+                                        ),
+                                        if (isDebug) ...[
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 4,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.red,
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
+                                            child: const Text(
+                                              'DEBUG',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    );
+                                  },
+                                ),
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
-      ),
-      body: _buildBody(context, homeDataAsync, history),
+          body: _buildBody(context, homeDataAsync, history),
+        );
+      },
     );
   }
 
@@ -201,12 +251,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (data.containsKey('Trending')) ...[
-                  HomeCarousel(
-                    items: data['Trending']!.cast<MultimediaItem>().toList(),
+                  DiscoverCarousel(
+                    movies: data['Trending']!
+                        .take(7)
+                        .cast<MultimediaItem>()
+                        .map(_mapItemToMap)
+                        .toList(),
+                    scrollController: _scrollController,
+                    onTap: (movieMap) {
+                      final item = movieMap['_originalItem'] as MultimediaItem;
+                      context.push('/details', extra: item);
+                    },
                   ),
                 ] else if (data.isNotEmpty) ...[
-                  HomeCarousel(
-                    items: data.values.first.cast<MultimediaItem>().toList(),
+                  DiscoverCarousel(
+                    movies: data.values.first
+                        .take(7)
+                        .cast<MultimediaItem>()
+                        .map(_mapItemToMap)
+                        .toList(),
+                    scrollController: _scrollController,
+                    onTap: (movieMap) {
+                      final item = movieMap['_originalItem'] as MultimediaItem;
+                      context.push('/details', extra: item);
+                    },
                   ),
                 ],
 
@@ -218,9 +286,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ],
 
                 ...data.entries.where((e) => e.key != 'Trending').map((entry) {
-                  return HomeSection(
+                  return MediaHorizontalList(
                     title: entry.key,
-                    items: entry.value.cast<MultimediaItem>().toList(),
+                    mediaList: entry.value
+                        .cast<MultimediaItem>()
+                        .map(_mapItemToMap)
+                        .toList(),
+                    category: ViewAllCategory.trending, // Placeholder
+                    showViewAll:
+                        false, // Provider sections don't support view all yet
+                    onTap: (movieMap) {
+                      final item = movieMap['_originalItem'] as MultimediaItem;
+                      context.push('/details', extra: item);
+                    },
+                    heroTagPrefix: 'home',
                   );
                 }),
               ],
@@ -231,6 +310,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (err, stack) => _buildErrorState(context, err.toString(), ref),
     );
+  }
+
+  Map<String, dynamic> _mapItemToMap(MultimediaItem item) {
+    return {
+      'id': item.url.hashCode, // Fake ID
+      'title': item.title,
+      'name': item.title, // For TV compatibility
+      'poster_path': item.posterUrl,
+      'backdrop_path': item.bannerUrl ?? item.posterUrl,
+      'overview': item.description,
+      'media_type': 'movie', // Default, logic could be improved
+      '_originalItem': item, // Store original item for navigation
+    };
   }
 
   Widget _buildErrorState(BuildContext context, String error, WidgetRef ref) {
