@@ -9,6 +9,7 @@ import 'widgets/unified_filter_dialog.dart';
 import '../../../shared/widgets/tv_cards_wrapper.dart'; // Import TvCardsWrapper
 import '../data/filter_provider.dart';
 import 'delegates/dashboard_search_delegate.dart';
+import '../../../../shared/widgets/shimmer_placeholder.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -47,7 +48,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Watch all providers
     final heroMovieAsync = ref.watch(dashboardHeroMovieProvider);
     final popularMoviesAsync = ref.watch(popularMoviesProvider);
     final popularTVAsync = ref.watch(popularTVProvider);
@@ -102,7 +102,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ),
             centerTitle: false,
             actions: [
-              // Unified Filter Button
               Padding(
                 padding: const EdgeInsets.only(right: 8.0),
                 child: TvCardsWrapper(
@@ -140,7 +139,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
               ),
 
-              // Search Button
               Padding(
                 padding: const EdgeInsets.only(right: 16.0),
                 child: TvCardsWrapper(
@@ -169,7 +167,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           body: CustomScrollView(
             controller: _scrollController,
             slivers: [
-              // Hero / Featured Carousel
               SliverToBoxAdapter(
                 child: heroMovieAsync.when(
                   data: (movies) {
@@ -179,9 +176,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       scrollController: _scrollController,
                     );
                   },
-                  loading: () => const SizedBox(
-                    height: 500,
-                    child: Center(child: CircularProgressIndicator()),
+                  loading: () => Padding(
+                    padding: const EdgeInsets.only(bottom: 24.0),
+                    child: const SizedBox(
+                      height: 500,
+                      width: double.infinity,
+                      child: ShimmerPlaceholder(),
+                    ),
                   ),
                   error: (err, stack) => SizedBox(
                     height: 500,
@@ -190,7 +191,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
               ),
 
-              // Section: Popular Movies
               SliverToBoxAdapter(
                 child: _buildSection(
                   popularMoviesAsync,
@@ -199,7 +199,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
               ),
 
-              // Section: Popular TV Shows
               SliverToBoxAdapter(
                 child: _buildSection(
                   popularTVAsync,
@@ -208,7 +207,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
               ),
 
-              // Section: New Movies
               SliverToBoxAdapter(
                 child: _buildSection(
                   nowPlayingAsync,
@@ -217,7 +215,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
               ),
 
-              // Section: New TV Shows
               SliverToBoxAdapter(
                 child: _buildSection(
                   onTheAirTVAsync,
@@ -226,7 +223,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
               ),
 
-              // Section: Featured Movies
               SliverToBoxAdapter(
                 child: _buildSection(
                   topRatedMoviesAsync,
@@ -235,7 +231,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
               ),
 
-              // Section: Featured TV Shows
               SliverToBoxAdapter(
                 child: _buildSection(
                   topRatedTVAsync,
@@ -244,7 +239,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
               ),
 
-              // Section: Airing Today
               SliverToBoxAdapter(
                 child: _buildSection(
                   airingTodayTVAsync,
@@ -253,9 +247,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
               ),
 
-              const SliverToBoxAdapter(
-                child: SizedBox(height: 100),
-              ), // Bottom spacing
+              const SliverToBoxAdapter(child: SizedBox(height: 100)),
             ],
           ),
         );
@@ -277,12 +269,45 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           category: category,
         );
       },
-      loading: () => SizedBox(
-        height: 250,
-        child: Center(
-          child: CircularProgressIndicator(
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
-          ),
+      loading: () => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Title Placeholder
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: const ShimmerPlaceholder.rectangular(
+                width: 150,
+                height: 24,
+              ),
+            ),
+            const SizedBox(height: 16),
+            // List Placeholder
+            SizedBox(
+              height: 250,
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                scrollDirection: Axis.horizontal,
+                itemCount: 5,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (_, __) => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: const ShimmerPlaceholder.rectangular(
+                        width: 130, // mobile width
+                        height: 195,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    ShimmerPlaceholder.rectangular(width: 100, height: 14),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
       error: (e, _) => const SizedBox.shrink(),

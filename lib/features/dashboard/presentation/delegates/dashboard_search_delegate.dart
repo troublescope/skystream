@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:async';
 
-// Internal Imports
 import '../../../../core/config/tmdb_config.dart';
 import '../../../../shared/widgets/shimmer_placeholder.dart';
 import '../../../details/presentation/tmdb_movie_details_screen.dart';
@@ -44,7 +43,6 @@ class DashboardSearchDelegate extends SearchDelegate {
   @override
   List<Widget>? buildActions(BuildContext context) {
     return [
-      // Clear Button
       if (query.isNotEmpty)
         IconButton(
           icon: const Icon(Icons.clear),
@@ -69,20 +67,12 @@ class DashboardSearchDelegate extends SearchDelegate {
   Widget buildResults(BuildContext context) {
     if (query.length < 2) return const SizedBox.shrink();
 
-    // Trigger search
     return _SearchResultsGrid(query: query, ref: ref);
   }
 
   @override
   Widget buildSuggestions(BuildContext context) {
     if (query.length < 2) return const SizedBox.shrink();
-
-    // Debounced Suggestions
-    // Note: SearchDelegate calls buildSuggestions on every keystroke.
-    // We'll use a FutureBuilder with a debounced future or just a direct future.
-    // Since we can't easily debounce the build method itself, we'll let the provider/service handle it
-    // or just return a FutureBuilder that fetches immediate results.
-    // For a smoother UX, let's return the simplified list view here.
 
     return _SearchSuggestionsList(query: query, ref: ref);
   }
@@ -125,7 +115,6 @@ class _SearchSuggestionsListState extends State<_SearchSuggestionsList> {
     _debounce = Timer(const Duration(milliseconds: 500), () async {
       try {
         final tmdb = widget.ref.read(tmdbServiceProvider);
-        // Force English results as per user request
         final results = await tmdb.multiSearch(
           query: widget.query,
           language: 'en-US',
@@ -160,7 +149,6 @@ class _SearchSuggestionsListState extends State<_SearchSuggestionsList> {
     }
 
     if (_suggestions.isEmpty) {
-      // Optional: Show "No results" or keep blank
       return Center(
         child: Text(
           'No results found',
@@ -263,7 +251,6 @@ class _SearchResultsGridState extends ConsumerState<_SearchResultsGrid> {
     setState(() => _isLoading = true);
     try {
       final tmdb = ref.read(tmdbServiceProvider);
-      // Force English results
       final results = await tmdb.multiSearch(
         query: widget.query,
         language: 'en-US',
@@ -321,7 +308,31 @@ class _SearchResultsGridState extends ConsumerState<_SearchResultsGrid> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading && _results.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      final screenWidth = MediaQuery.of(context).size.width;
+      final isDesktop = screenWidth > 800;
+      final maxExtent = isDesktop ? 240.0 : 150.0;
+      final childAspectRatio = 0.55;
+
+      return GridView.builder(
+        padding: const EdgeInsets.all(16),
+        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: maxExtent,
+          childAspectRatio: childAspectRatio,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+        ),
+        itemCount: 10,
+        itemBuilder: (context, index) {
+          return const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: ShimmerPlaceholder()),
+              SizedBox(height: 8),
+              ShimmerPlaceholder.rectangular(height: 14),
+            ],
+          );
+        },
+      );
     }
 
     if (_results.isEmpty) {
@@ -364,14 +375,13 @@ class _SearchResultsGridState extends ConsumerState<_SearchResultsGrid> {
       itemCount: _results.length + (_isLoading ? 1 : 0),
       itemBuilder: (context, index) {
         if (index >= _results.length) {
-          return const Center(child: CircularProgressIndicator());
+          return const ShimmerPlaceholder();
         }
 
         final item = _results[index];
         final posterPath = item['poster_path'];
-        // Use high res for search results
         final imageUrl = posterPath != null
-            ? '${TmdbConfig.imageBaseUrl}$posterPath'
+            ? '${TmdbConfig.posterSizeUrl}$posterPath'
             : 'https://via.placeholder.com/150x225';
         final title = item['title'] ?? item['name'] ?? 'Unknown';
         final id = item['id'];
@@ -403,11 +413,7 @@ class _SearchResultsGridState extends ConsumerState<_SearchResultsGrid> {
                       imageUrl: imageUrl,
                       fit: BoxFit.cover,
                       width: double.infinity,
-                      placeholder: (_, __) => Container(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.surfaceContainerHighest,
-                      ),
+                      placeholder: (_, __) => const ShimmerPlaceholder(),
                       errorWidget: (_, __, ___) => Container(
                         color: Theme.of(
                           context,

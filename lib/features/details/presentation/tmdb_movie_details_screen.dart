@@ -11,8 +11,8 @@ import '../../dashboard/data/language_provider.dart';
 import 'widgets/provider_search_section.dart';
 import '../../../shared/widgets/desktop_scroll_wrapper.dart';
 import '../../../shared/widgets/tv_cards_wrapper.dart'; // Import TvCardsWrapper
+import '../../../shared/widgets/shimmer_placeholder.dart';
 
-// ignore: camel_case_types
 class MovieDetailsParams {
   final int id;
   final String type; // 'movie' or 'tv'
@@ -26,7 +26,6 @@ class MovieDetailsParams {
   int get hashCode => Object.hash(id, type);
 }
 
-// Provider family to fetch movie/tv details
 final movieDetailsProvider =
     FutureProvider.family<Map<String, dynamic>?, MovieDetailsParams>((
       ref,
@@ -67,7 +66,6 @@ class _TmdbMovieDetailsScreenState
   late ScrollController _scrollController;
   final ValueNotifier<bool> _showAppBarTitle = ValueNotifier<bool>(false);
 
-  // Season Selection State
   int _selectedSeason = 1;
 
   Future<Map<String, dynamic>?>? _episodesFuture;
@@ -193,7 +191,7 @@ class _TmdbMovieDetailsScreenState
     var title = data['title'] ?? data['name'] ?? '';
     var overview = data['overview'] ?? '';
 
-    // Fix Titles/Overview
+    // Use English translation if available to avoid empty fields
     if (data['translations'] != null) {
       final translations = List<Map<String, dynamic>>.from(
         data['translations']['translations'] ?? [],
@@ -231,7 +229,7 @@ class _TmdbMovieDetailsScreenState
     final genres = List<Map<String, dynamic>>.from(data['genres'] ?? []);
     final genreText = genres.map((g) => g['name']).join(' | ');
 
-    // Certification
+    // Determine Certification
     String certification = isMovie ? "PG-13" : "TV-14";
     if (isMovie) {
       final releaseDates = data['release_dates'] != null
@@ -292,7 +290,6 @@ class _TmdbMovieDetailsScreenState
       logoUrl = TmdbService.pickBestLogo(logos, language);
     }
 
-    // Trailers & Production
     final videos = List<Map<String, dynamic>>.from(
       data['videos'] != null ? data['videos']['results'] : [],
     );
@@ -309,9 +306,22 @@ class _TmdbMovieDetailsScreenState
     final status = data['status'] ?? 'Unknown';
     final budget = data['budget'] ?? 0;
     final revenue = data['revenue'] ?? 0;
+    final tagline = data['tagline'] ?? '';
+    final originCountry = (data['origin_country'] as List?)?.join(', ') ?? 'US';
+    final originalLanguage =
+        (data['original_language'] as String?)?.toUpperCase() ?? 'EN';
+    final releaseDateFull = isMovie
+        ? (data['release_date'] ?? '')
+        : (data['first_air_date'] ?? '');
+
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final scaffoldColor = theme.scaffoldBackgroundColor;
+    final textColor = theme.colorScheme.onSurface;
+    final textSecondary = theme.colorScheme.onSurface.withOpacity(0.7);
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: scaffoldColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -319,24 +329,24 @@ class _TmdbMovieDetailsScreenState
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.of(context).pop(),
           style: IconButton.styleFrom(
-            backgroundColor: Colors.black45,
-            foregroundColor: Colors.white,
+            backgroundColor: isDark ? Colors.black45 : Colors.white54,
+            foregroundColor: textColor,
           ),
         ),
       ),
+      extendBodyBehindAppBar: true,
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // 1. Backdrop
           if (backdropPath != null)
             Positioned.fill(
               child: ShaderMask(
                 shaderCallback: (rect) {
-                  return const LinearGradient(
+                  return LinearGradient(
                     begin: Alignment.centerLeft,
                     end: Alignment.centerRight,
-                    colors: [Colors.black, Colors.transparent],
-                    stops: [0.2, 1.0],
+                    colors: [scaffoldColor, Colors.transparent],
+                    stops: const [0.2, 1.0],
                   ).createShader(rect);
                 },
                 blendMode: BlendMode.dstOut,
@@ -348,7 +358,6 @@ class _TmdbMovieDetailsScreenState
               ),
             ),
 
-          // Gradient Overlay (Force Black on Left)
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
@@ -356,8 +365,8 @@ class _TmdbMovieDetailsScreenState
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
                   colors: [
-                    Colors.black,
-                    Colors.black.withOpacity(0.8),
+                    scaffoldColor.withOpacity(0.8),
+                    scaffoldColor.withOpacity(0.4),
                     Colors.transparent,
                   ],
                   stops: const [0.0, 0.4, 1.0],
@@ -366,44 +375,45 @@ class _TmdbMovieDetailsScreenState
             ),
           ),
 
-          // Vertical Gradient (Bottom Up)
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.bottomCenter,
                   end: Alignment.topCenter,
-                  colors: [Colors.black, Colors.transparent],
+                  colors: [scaffoldColor, Colors.transparent],
                   stops: const [0.0, 0.4],
                 ),
               ),
             ),
           ),
 
-          // 2. Content
           Positioned.fill(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 60),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // HERO Section
                   SizedBox(
                     width: MediaQuery.of(context).size.width * 0.6, // 60% Width
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Logo or Title
                         if (logoUrl != null)
                           CachedNetworkImage(
                             imageUrl: logoUrl,
                             height: 200,
                             alignment: Alignment.centerLeft,
                             fit: BoxFit.contain,
+                            // In Light mode, white logos might be invisible.
+                            //Ideally we need dark logos for light mode but TMDB API is tricky.
+                            // For now, we rely on the fact most logos are colored or white.
+                            // If white on white, it fails.
+                            // Adding a shadow could help, but let's stick to standard logic first.
                             placeholder: (_, __) => Text(
                               title,
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: textColor,
                                 fontSize: 56,
                                 fontWeight: FontWeight.bold,
                                 height: 1.1,
@@ -413,29 +423,27 @@ class _TmdbMovieDetailsScreenState
                         else
                           Text(
                             title,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: textColor,
                               fontSize: 56,
                               fontWeight: FontWeight.bold,
                               height: 1.1,
                             ),
                           ),
                         const SizedBox(height: 24),
-
-                        // Metadata Row
                         Row(
                           children: [
                             Text(
                               year.isNotEmpty ? "$year  •  " : "",
-                              style: const TextStyle(
-                                color: Colors.white70,
+                              style: TextStyle(
+                                color: textSecondary,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             Text(
                               durationText,
-                              style: const TextStyle(
-                                color: Colors.white70,
+                              style: TextStyle(
+                                color: textSecondary,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -446,20 +454,19 @@ class _TmdbMovieDetailsScreenState
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                border: Border.all(color: Colors.white30),
+                                border: Border.all(color: textSecondary),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
                                 certification,
-                                style: const TextStyle(
-                                  color: Colors.white70,
+                                style: TextStyle(
+                                  color: textSecondary,
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ),
                             const SizedBox(width: 12),
-                            // TMDB/IMDb Badge
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 4,
@@ -492,16 +499,16 @@ class _TmdbMovieDetailsScreenState
                               Container(
                                 width: 4,
                                 height: 4,
-                                decoration: const BoxDecoration(
-                                  color: Colors.white54,
+                                decoration: BoxDecoration(
+                                  color: textSecondary,
                                   shape: BoxShape.circle,
                                 ),
                               ),
                               const SizedBox(width: 12),
                               Text(
                                 "Director: $director",
-                                style: const TextStyle(
-                                  color: Colors.white70,
+                                style: TextStyle(
+                                  color: textSecondary,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -509,32 +516,26 @@ class _TmdbMovieDetailsScreenState
                           ],
                         ),
                         const SizedBox(height: 20),
-
-                        // Overview
                         Text(
                           overview,
                           maxLines: 4,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white70,
+                          style: TextStyle(
+                            color: textSecondary,
                             fontSize: 16,
                             height: 1.5,
                           ),
                         ),
                         const SizedBox(height: 12),
-
-                        // Genres
                         Text(
                           genreText,
-                          style: const TextStyle(
-                            color: Colors.white54,
+                          style: TextStyle(
+                            color: textSecondary.withOpacity(0.5),
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
                         const SizedBox(height: 32),
-
-                        // Available Sources
                         Row(
                           children: [
                             Icon(
@@ -543,10 +544,10 @@ class _TmdbMovieDetailsScreenState
                               size: 20,
                             ),
                             const SizedBox(width: 8),
-                            const Text(
+                            Text(
                               "Available Sources",
                               style: TextStyle(
-                                color: Colors.white,
+                                color: textColor,
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -591,37 +592,44 @@ class _TmdbMovieDetailsScreenState
 
                   const SizedBox(height: 60),
 
-                  // SECTIONS (Vertical)
-
-                  // 1. Episodes (TV Only)
                   if (!isMovie) ...[
                     Row(
                       children: [
-                        const Text(
+                        Text(
                           "Episodes",
                           style: TextStyle(
-                            color: Colors.white,
+                            color: textColor,
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         const SizedBox(width: 20),
-                        // Season Selector
-                        DropdownButton<int>(
-                          value: _selectedSeason,
-                          dropdownColor: Colors.grey[900],
-                          style: const TextStyle(color: Colors.white),
-                          items: seasons.map<DropdownMenuItem<int>>((s) {
-                            final num = s['season_number'];
-                            final count = s['episode_count'];
-                            return DropdownMenuItem(
-                              value: num,
-                              child: Text("Season $num (${count} Ep)"),
-                            );
-                          }).toList(),
-                          onChanged: (val) {
-                            if (val != null) _fetchEpisodes(val);
-                          },
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.grey[900] : Colors.grey[200],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: DropdownButton<int>(
+                            value: _selectedSeason,
+                            dropdownColor: isDark
+                                ? Colors.grey[900]
+                                : Colors.white,
+                            underline: const SizedBox(),
+                            style: TextStyle(color: textColor),
+                            icon: Icon(Icons.arrow_drop_down, color: textColor),
+                            items: seasons.map<DropdownMenuItem<int>>((s) {
+                              final num = s['season_number'];
+                              final count = s['episode_count'];
+                              return DropdownMenuItem(
+                                value: num,
+                                child: Text("Season $num (${count} Ep)"),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) _fetchEpisodes(val);
+                            },
+                          ),
                         ),
                       ],
                     ),
@@ -630,12 +638,11 @@ class _TmdbMovieDetailsScreenState
                     const SizedBox(height: 50),
                   ],
 
-                  // 2. Cast
                   if (cast.isNotEmpty) ...[
-                    const Text(
+                    Text(
                       "Cast",
                       style: TextStyle(
-                        color: Colors.white,
+                        color: textColor,
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                       ),
@@ -679,8 +686,8 @@ class _TmdbMovieDetailsScreenState
                                     width: 80,
                                     child: Text(
                                       actor['name'],
-                                      style: const TextStyle(
-                                        color: Colors.white,
+                                      style: TextStyle(
+                                        color: textColor,
                                         fontSize: 12,
                                       ),
                                       maxLines: 1,
@@ -692,8 +699,8 @@ class _TmdbMovieDetailsScreenState
                                     width: 80,
                                     child: Text(
                                       actor['character'] ?? '',
-                                      style: const TextStyle(
-                                        color: Colors.white54,
+                                      style: TextStyle(
+                                        color: textSecondary,
                                         fontSize: 10,
                                       ),
                                       maxLines: 1,
@@ -711,12 +718,11 @@ class _TmdbMovieDetailsScreenState
                     const SizedBox(height: 50),
                   ],
 
-                  // 3. Trailers
                   if (trailers.isNotEmpty) ...[
-                    const Text(
+                    Text(
                       "Trailers & Clips",
                       style: TextStyle(
-                        color: Colors.white,
+                        color: textColor,
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                       ),
@@ -773,76 +779,121 @@ class _TmdbMovieDetailsScreenState
                     ),
                     const SizedBox(height: 50),
                   ],
+                  if (productionCompanies.isNotEmpty) ...[
+                    Text(
+                      "Production",
+                      style: TextStyle(
+                        color: textColor,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      height: 80, // Taller for 1.5x icons
+                      child: DesktopScrollWrapper(
+                        controller: ScrollController(),
+                        child: ListView.separated(
+                          clipBehavior: Clip.none,
+                          scrollDirection: Axis.horizontal,
+                          itemCount: productionCompanies.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(width: 24),
+                          itemBuilder: (context, index) {
+                            final c = productionCompanies[index];
+                            final logo = c['logo_path'];
+                            if (logo != null) {
+                              return Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: CachedNetworkImage(
+                                  imageUrl: '${TmdbConfig.imageBaseUrl}$logo',
+                                  height: 36, // 1.5x
+                                  fit: BoxFit.contain,
+                                  placeholder: (_, __) =>
+                                      const SizedBox(width: 36, height: 36),
+                                  errorWidget: (_, __, ___) =>
+                                      const Icon(Icons.error, size: 36),
+                                ),
+                              );
+                            }
+                            return Chip(
+                              label: Text(c['name']),
+                              backgroundColor: textSecondary.withOpacity(0.1),
+                              labelStyle: TextStyle(
+                                color: textColor,
+                                fontSize: 14,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 50),
+                  ],
 
-                  // 5. Details (Production, Status)
+                  // 5. Details (Rich Stats)
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        "Details",
+                      Text(
+                        isMovie ? "Movie Details" : "Show Details",
                         style: TextStyle(
-                          color: Colors.white,
+                          color: textColor,
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 24),
+                      if (tagline.isNotEmpty) ...[
+                        _buildDetailItem(
+                          "Tagline",
+                          "\"$tagline\"",
+                          italic: true,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
                       Wrap(
-                        spacing: 24,
-                        runSpacing: 12,
+                        spacing: 40,
+                        runSpacing: 24,
                         children: [
                           _buildDetailItem("Status", status),
+                          _buildDetailItem(
+                            isMovie ? "Release Date" : "First Air Date",
+                            releaseDateFull.isNotEmpty
+                                ? DateFormat(
+                                    'MMMM d, yyyy',
+                                  ).format(DateTime.parse(releaseDateFull))
+                                : 'Unknown',
+                          ),
+                          _buildDetailItem(
+                            "Original Language",
+                            originalLanguage,
+                          ),
+                          _buildDetailItem("Origin Country", originCountry),
                           if (budget > 0)
                             _buildDetailItem(
                               "Budget",
-                              "\$${(budget / 1000000).toStringAsFixed(1)}M",
+                              NumberFormat.currency(
+                                symbol: '\$',
+                                decimalDigits: 0,
+                              ).format(budget),
                             ),
                           if (revenue > 0)
                             _buildDetailItem(
                               "Revenue",
-                              "\$${(revenue / 1000000).toStringAsFixed(1)}M",
+                              NumberFormat.currency(
+                                symbol: '\$',
+                                decimalDigits: 0,
+                              ).format(revenue),
                             ),
-                          if (productionCompanies.isNotEmpty) ...[
-                            const SizedBox(height: 16),
-                            const Text(
-                              "Production",
-                              style: TextStyle(
-                                color: Colors.white54,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 16,
-                              runSpacing: 16,
-                              children: productionCompanies.map((c) {
-                                final logo = c['logo_path'];
-                                if (logo != null) {
-                                  return Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: CachedNetworkImage(
-                                      imageUrl:
-                                          '${TmdbConfig.imageBaseUrl}$logo',
-                                      height: 24,
-                                      fit: BoxFit.contain,
-                                    ),
-                                  );
-                                }
-                                return Chip(
-                                  label: Text(c['name']),
-                                  backgroundColor: Colors.white10,
-                                  labelStyle: const TextStyle(
-                                    color: Colors.white,
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ],
                         ],
                       ),
                     ],
@@ -858,14 +909,18 @@ class _TmdbMovieDetailsScreenState
     );
   }
 
-  Widget _buildDetailItem(String label, String value) {
+  Widget _buildDetailItem(String label, String value, {bool italic = false}) {
+    final theme = Theme.of(context);
+    final textColor = theme.colorScheme.onSurface;
+    final textSecondary = theme.colorScheme.onSurface.withOpacity(0.7);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(
-            color: Colors.white54,
+          style: TextStyle(
+            color: textSecondary,
             fontSize: 12,
             fontWeight: FontWeight.bold,
           ),
@@ -873,10 +928,11 @@ class _TmdbMovieDetailsScreenState
         const SizedBox(height: 4),
         Text(
           value,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: textColor,
             fontSize: 14,
             fontWeight: FontWeight.bold,
+            fontStyle: italic ? FontStyle.italic : FontStyle.normal,
           ),
         ),
       ],
@@ -888,8 +944,39 @@ class _TmdbMovieDetailsScreenState
     return FutureBuilder<Map<String, dynamic>?>(
       future: _episodesFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting)
-          return const Center(child: CircularProgressIndicator());
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return SizedBox(
+            height: 240,
+            child: ListView.separated(
+              padding: EdgeInsets.zero,
+              scrollDirection: Axis.horizontal,
+              itemCount: 5,
+              separatorBuilder: (_, __) => const SizedBox(width: 16),
+              itemBuilder: (_, __) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Expanded(
+                    child: ShimmerPlaceholder.rectangular(
+                      width: 300,
+                      height: double.infinity,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        ShimmerPlaceholder.rectangular(width: 150, height: 14),
+                        SizedBox(height: 6),
+                        ShimmerPlaceholder.rectangular(width: 100, height: 12),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
         if (!snapshot.hasData) return const SizedBox.shrink();
         final episodes = List<Map<String, dynamic>>.from(
           snapshot.data!['episodes'] ?? [],
@@ -938,7 +1025,9 @@ class _TmdbMovieDetailsScreenState
                   child: Container(
                     width: 300,
                     decoration: BoxDecoration(
-                      color: Colors.white10,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest.withOpacity(0.5),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     clipBehavior: Clip.antiAlias,
@@ -952,12 +1041,7 @@ class _TmdbMovieDetailsScreenState
                                   fit: BoxFit.cover,
                                   width: double.infinity,
                                 )
-                              : const Center(
-                                  child: Icon(
-                                    Icons.movie,
-                                    color: Colors.white54,
-                                  ),
-                                ),
+                              : const Center(child: ShimmerPlaceholder()),
                         ),
                         Padding(
                           padding: const EdgeInsets.all(12),
@@ -968,8 +1052,10 @@ class _TmdbMovieDetailsScreenState
                                 "E${ep['episode_number']} • ${ep['name']}",
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -993,8 +1079,11 @@ class _TmdbMovieDetailsScreenState
                                   if (runtime > 0)
                                     Text(
                                       runtimeText,
-                                      style: const TextStyle(
-                                        color: Colors.white54,
+                                      style: TextStyle(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface
+                                            .withOpacity(0.7),
                                         fontSize: 12,
                                         fontWeight: FontWeight.bold,
                                       ),
@@ -1006,8 +1095,10 @@ class _TmdbMovieDetailsScreenState
                                 ep['overview'] ?? '',
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white54,
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface.withOpacity(0.7),
                                   fontSize: 12,
                                 ),
                               ),
@@ -1027,7 +1118,6 @@ class _TmdbMovieDetailsScreenState
   }
 
   Widget _buildMobileLayout(Map<String, dynamic> data) {
-    // Data Extraction
     final isMovie = widget.mediaType == 'movie';
 
     final backdropPath = data['backdrop_path'];
@@ -1077,14 +1167,12 @@ class _TmdbMovieDetailsScreenState
       data['videos'] != null ? data['videos']['results'] : [],
     );
 
-    // Logic extraction
     final hours = runtime ~/ 60;
     final minutes = runtime % 60;
     final durationText = hours > 0 ? '${hours}H ${minutes}M' : '${minutes}M';
     final year = releaseDate.isNotEmpty ? releaseDate.split('-')[0] : '';
     final rating = (data['vote_average'] as num?)?.toStringAsFixed(1) ?? '0.0';
 
-    // Find Certification
     String certification = isMovie ? "PG-13" : "TV-14";
     if (isMovie) {
       final releaseDates = data['release_dates'] != null
@@ -1115,7 +1203,6 @@ class _TmdbMovieDetailsScreenState
       }
     }
 
-    // Find Director / Creator
     String director = "Unknown";
     if (isMovie) {
       final dir = crew.firstWhere(
@@ -1130,7 +1217,6 @@ class _TmdbMovieDetailsScreenState
       }
     }
 
-    // Logo
     String? logoUrl;
     final images = data['images'];
     if (images != null) {
@@ -1144,7 +1230,6 @@ class _TmdbMovieDetailsScreenState
     return CustomScrollView(
       controller: _scrollController,
       slivers: [
-        // 1. Immersive Header
         SliverAppBar(
           expandedHeight: 550,
           pinned: true,
@@ -1607,7 +1692,20 @@ class _TmdbMovieDetailsScreenState
                       itemBuilder: (context, index) {
                         final company = productionCompanies[index];
                         final logo = company['logo_path'];
-                        if (logo == null) return const SizedBox.shrink();
+                        if (logo == null) {
+                          return Container(
+                            margin: const EdgeInsets.only(right: 16),
+                            child: Chip(
+                              label: Text(company['name'] ?? ''),
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withOpacity(0.1),
+                              labelStyle: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
+                            ),
+                          );
+                        }
                         return Container(
                           margin: const EdgeInsets.only(right: 16),
                           padding: const EdgeInsets.all(8),
