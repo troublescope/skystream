@@ -151,6 +151,7 @@ class _MediaHorizontalListState extends State<MediaHorizontalList> {
           child: DesktopScrollWrapper(
             // Wraps ListView
             controller: _scrollController,
+            showButtons: isDesktop, // Show nav buttons on desktop/TV
             child: ListView.separated(
               controller: _scrollController, // Passes controller
               clipBehavior: Clip.none,

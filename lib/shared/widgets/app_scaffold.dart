@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:skystream/core/providers/device_info_provider.dart';
 import 'package:skystream/shared/widgets/custom_bottom_nav.dart';
+import 'package:virtual_mouse/virtual_mouse.dart';
 
 class AppScaffold extends ConsumerStatefulWidget {
   final Widget child;
@@ -50,8 +51,9 @@ class _AppScaffoldState extends ConsumerState<AppScaffold> {
     return deviceProfileAsync.when(
       data: (profile) {
         // Desktop or TV use Side Navigation
+        // VirtualMouse cursor only shown on TV, not desktop
         if (profile.isLargeScreen) {
-          return Scaffold(
+          final sideNavScaffold = Scaffold(
             body: Row(
               children: [
                 NavigationRail(
@@ -92,6 +94,18 @@ class _AppScaffoldState extends ConsumerState<AppScaffold> {
               ],
             ),
           );
+
+          // Wrap with VirtualMouse only on TV
+          if (profile.isTv) {
+            return VirtualMouse(
+              visible: true,
+              velocity: 5,
+              pointerColor: Theme.of(context).colorScheme.primary,
+              child: sideNavScaffold,
+            );
+          }
+
+          return sideNavScaffold;
         }
 
         // Mobile uses Bottom Navigation

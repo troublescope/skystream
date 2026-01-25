@@ -27,7 +27,6 @@ class _DiscoverCarouselState extends State<DiscoverCarousel> {
   int _currentIndex = 0;
   final CarouselSliderController _carouselController =
       CarouselSliderController();
-  bool _isHovered = false;
 
   @override
   Widget build(BuildContext context) {
@@ -39,120 +38,117 @@ class _DiscoverCarouselState extends State<DiscoverCarousel> {
 
     return SizedBox(
       height: heroHeight,
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _isHovered = true),
-        onExit: (_) => setState(() => _isHovered = false),
-        child: Stack(
-          children: [
-            CarouselSlider.builder(
-              carouselController: _carouselController,
-              itemCount: widget.movies.length,
-              options: CarouselOptions(
-                height: heroHeight,
-                viewportFraction: 1.0,
-                autoPlay: true,
-                autoPlayInterval: const Duration(seconds: 15),
-                autoPlayAnimationDuration: const Duration(milliseconds: 1000),
-                autoPlayCurve: Curves.fastOutSlowIn,
-                scrollPhysics: const BouncingScrollPhysics(),
-                onPageChanged: (index, reason) {
-                  setState(() {
-                    _currentIndex = index;
-                  });
-                },
-              ),
-              itemBuilder: (context, index, realIndex) {
-                final movie = widget.movies[index];
-                return _buildCarouselItem(context, movie, heroHeight);
+      child: Stack(
+        children: [
+          CarouselSlider.builder(
+            carouselController: _carouselController,
+            itemCount: widget.movies.length,
+            options: CarouselOptions(
+              height: heroHeight,
+              viewportFraction: 1.0,
+              autoPlay: true,
+              autoPlayInterval: const Duration(seconds: 15),
+              autoPlayAnimationDuration: const Duration(milliseconds: 1000),
+              autoPlayCurve: Curves.fastOutSlowIn,
+              scrollPhysics: const BouncingScrollPhysics(),
+              onPageChanged: (index, reason) {
+                setState(() {
+                  _currentIndex = index;
+                });
               },
             ),
+            itemBuilder: (context, index, realIndex) {
+              final movie = widget.movies[index];
+              return _buildCarouselItem(context, movie, heroHeight);
+            },
+          ),
 
-            // Animated Pagination Dots
-            Positioned(
-              bottom: 20,
-              left: 0,
-              right: 0,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: widget.movies.asMap().entries.map((entry) {
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    width: _currentIndex == entry.key ? 24.0 : 8.0,
-                    height: 8.0,
-                    margin: const EdgeInsets.symmetric(horizontal: 4.0),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(4),
-                      color: Theme.of(context).colorScheme.onSurface
-                          .withOpacity(
-                            _currentIndex == entry.key
-                                ? 0.9
-                                : 0.3, // Slightly lower opacity for inactive
-                          ),
+          // Animated Pagination Dots
+          Positioned(
+            bottom: 20,
+            left: 0,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: widget.movies.asMap().entries.map((entry) {
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  width: _currentIndex == entry.key ? 24.0 : 8.0,
+                  height: 8.0,
+                  margin: const EdgeInsets.symmetric(horizontal: 4.0),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(4),
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(
+                      _currentIndex == entry.key
+                          ? 0.9
+                          : 0.3, // Slightly lower opacity for inactive
                     ),
-                  );
-                }).toList(),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+
+          // Left Navigation Button
+          if (isDesktop)
+            AnimatedOpacity(
+              opacity:
+                  1.0, // Always visible on large screens for TV/desktop nav
+              duration: const Duration(milliseconds: 200),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 20),
+                  child: Material(
+                    color: Colors.black.withOpacity(0.5),
+                    shape: const CircleBorder(),
+                    clipBehavior: Clip.antiAlias,
+                    child: IconButton(
+                      onPressed: () => _carouselController.previousPage(),
+                      style: IconButton.styleFrom(
+                        padding: const EdgeInsets.all(16),
+                      ),
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
 
-            // Left Navigation Button
-            if (isDesktop)
-              AnimatedOpacity(
-                opacity: _isHovered ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 200),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 20),
-                    child: Material(
-                      color: Colors.black.withOpacity(0.5),
-                      shape: const CircleBorder(),
-                      clipBehavior: Clip.antiAlias,
-                      child: IconButton(
-                        onPressed: () => _carouselController.previousPage(),
-                        style: IconButton.styleFrom(
-                          padding: const EdgeInsets.all(16),
-                        ),
-                        icon: const Icon(
-                          Icons.arrow_back_ios_new,
-                          color: Colors.white,
-                          size: 24,
-                        ),
+          // Right Navigation Button
+          if (isDesktop)
+            AnimatedOpacity(
+              opacity:
+                  1.0, // Always visible on large screens for TV/desktop nav
+              duration: const Duration(milliseconds: 200),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 20),
+                  child: Material(
+                    color: Colors.black.withOpacity(0.5),
+                    shape: const CircleBorder(),
+                    clipBehavior: Clip.antiAlias,
+                    child: IconButton(
+                      onPressed: () => _carouselController.nextPage(),
+                      style: IconButton.styleFrom(
+                        padding: const EdgeInsets.all(16),
+                      ),
+                      icon: const Icon(
+                        Icons.arrow_forward_ios,
+                        color: Colors.white,
+                        size: 24,
                       ),
                     ),
                   ),
                 ),
               ),
-
-            // Right Navigation Button
-            if (isDesktop)
-              AnimatedOpacity(
-                opacity: _isHovered ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 200),
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 20),
-                    child: Material(
-                      color: Colors.black.withOpacity(0.5),
-                      shape: const CircleBorder(),
-                      clipBehavior: Clip.antiAlias,
-                      child: IconButton(
-                        onPressed: () => _carouselController.nextPage(),
-                        style: IconButton.styleFrom(
-                          padding: const EdgeInsets.all(16),
-                        ),
-                        icon: const Icon(
-                          Icons.arrow_forward_ios,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }

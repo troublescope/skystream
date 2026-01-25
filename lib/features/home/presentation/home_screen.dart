@@ -379,65 +379,113 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void _showProviderSelector(BuildContext context, WidgetRef ref) {
     final extManager = ref.read(extensionManagerProvider.notifier);
     final activeProvider = ref.read(activeProviderStateProvider);
+    final providers = extManager.getAllProviders();
+
+    // Find index of selected provider for auto-scroll
+    int selectedIndex = 0; // 0 is "None"
+    if (activeProvider != null) {
+      for (int i = 0; i < providers.length; i++) {
+        if (providers[i].id == activeProvider.id) {
+          selectedIndex = i + 1; // +1 because "None" is at index 0
+          break;
+        }
+      }
+    }
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Select Provider'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            RadioListTile<String?>(
-              title: const Text('None'),
-              value: null,
-              groupValue: activeProvider?.id,
-              onChanged: (val) {
-                ref.read(activeProviderStateProvider.notifier).set(null);
-                Navigator.pop(context);
-                ref.refresh(homeDataProvider);
-              },
+      builder: (context) {
+        final scrollController = ScrollController();
+
+        // Auto-scroll to selected item after dialog opens
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (scrollController.hasClients && selectedIndex > 0) {
+            // Approximate height of each RadioListTile
+            const itemHeight = 56.0;
+            final targetOffset = (selectedIndex * itemHeight) - 100;
+            scrollController.animateTo(
+              targetOffset.clamp(
+                0.0,
+                scrollController.position.maxScrollExtent,
+              ),
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut,
+            );
+          }
+        });
+
+        return AlertDialog(
+          title: const Text('Select Provider'),
+          content: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.6,
             ),
-            ...extManager.getAllProviders().map((p) {
-              final isDebug = p.isDebug;
-              return RadioListTile<String?>(
-                title: Row(
-                  children: [
-                    Text(p.name),
-                    if (isDebug) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.red,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          'DEBUG',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
+            child: SizedBox(
+              width: double.maxFinite,
+              child: ListView.builder(
+                controller: scrollController,
+                shrinkWrap: true,
+                itemCount: providers.length + 1, // +1 for "None"
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    // "None" option
+                    return RadioListTile<String?>(
+                      title: const Text('None'),
+                      value: null,
+                      groupValue: activeProvider?.id,
+                      onChanged: (val) {
+                        ref
+                            .read(activeProviderStateProvider.notifier)
+                            .set(null);
+                        Navigator.pop(context);
+                        ref.refresh(homeDataProvider);
+                      },
+                    );
+                  }
+
+                  final p = providers[index - 1];
+                  final isDebug = p.isDebug;
+                  return RadioListTile<String?>(
+                    title: Row(
+                      children: [
+                        Text(p.name),
+                        if (isDebug) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'DEBUG',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                value: p.id,
-                groupValue: activeProvider?.id,
-                onChanged: (val) {
-                  ref.read(activeProviderStateProvider.notifier).set(p);
-                  Navigator.pop(context);
-                  ref.refresh(homeDataProvider);
+                        ],
+                      ],
+                    ),
+                    value: p.id,
+                    groupValue: activeProvider?.id,
+                    onChanged: (val) {
+                      ref.read(activeProviderStateProvider.notifier).set(p);
+                      Navigator.pop(context);
+                      ref.refresh(homeDataProvider);
+                    },
+                  );
                 },
-              );
-            }),
-          ],
-        ),
-      ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

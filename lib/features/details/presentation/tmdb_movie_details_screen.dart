@@ -790,7 +790,7 @@ class _TmdbMovieDetailsScreenState
                     ),
                     const SizedBox(height: 20),
                     SizedBox(
-                      height: 80, // Taller for 1.5x icons
+                      height: 50, // Reduced for TV
                       child: DesktopScrollWrapper(
                         controller: ScrollController(),
                         child: ListView.separated(
@@ -804,19 +804,19 @@ class _TmdbMovieDetailsScreenState
                             final logo = c['logo_path'];
                             if (logo != null) {
                               return Container(
-                                padding: const EdgeInsets.all(12),
+                                padding: const EdgeInsets.all(6),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: CachedNetworkImage(
                                   imageUrl: '${TmdbConfig.imageBaseUrl}$logo',
-                                  height: 36, // 1.5x
+                                  height: 20, // Reduced for TV
                                   fit: BoxFit.contain,
                                   placeholder: (_, __) =>
-                                      const SizedBox(width: 36, height: 36),
+                                      const SizedBox(width: 20, height: 20),
                                   errorWidget: (_, __, ___) =>
-                                      const Icon(Icons.error, size: 36),
+                                      const Icon(Icons.error, size: 20),
                                 ),
                               );
                             }

@@ -294,6 +294,7 @@ class _RatingTab extends ConsumerWidget {
             borderRadius: BorderRadius.circular(12),
           ),
           tileColor: isSelected ? Colors.blueAccent.withOpacity(0.2) : null,
+          focusColor: Colors.blueAccent.withOpacity(0.5),
           leading: Icon(
             Icons.star,
             color: isSelected
@@ -355,6 +356,7 @@ class _LanguageTab extends ConsumerWidget {
             ref.read(languageProvider.notifier).setLanguage(lang.code);
           },
           borderRadius: BorderRadius.circular(16),
+          focusColor: Colors.blueAccent.withOpacity(0.6),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
@@ -487,6 +489,7 @@ class _GenreTab extends ConsumerWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             tileColor: isSelected ? Colors.blueAccent.withOpacity(0.2) : null,
+            focusColor: Colors.blueAccent.withOpacity(0.5),
             leading: Icon(
               isSelected ? Icons.check_circle : Icons.circle_outlined,
               color: isSelected
@@ -543,6 +546,7 @@ class _YearTab extends ConsumerWidget {
               ref.read(discoverFilterProvider.notifier).setYear(null);
             },
             borderRadius: BorderRadius.circular(8),
+            focusColor: Colors.blueAccent.withOpacity(0.6),
             child: Container(
               alignment: Alignment.center,
               decoration: BoxDecoration(
@@ -578,6 +582,7 @@ class _YearTab extends ConsumerWidget {
             ref.read(discoverFilterProvider.notifier).setYear(year);
           },
           borderRadius: BorderRadius.circular(8),
+          focusColor: Colors.blueAccent.withOpacity(0.4),
           child: Container(
             alignment: Alignment.center,
             decoration: BoxDecoration(
