@@ -20,6 +20,8 @@ import '../../../../features/settings/presentation/player_settings_provider.dart
 import '../../../../core/services/torrent_service.dart';
 import '../../../../core/models/torrent_status.dart';
 import '../../../../core/extensions/providers/js_based_provider.dart';
+import '../../../../core/providers/device_info_provider.dart';
+import '../../../../shared/widgets/tv_input_widgets.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
   final MultimediaItem item;
@@ -50,16 +52,33 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   BoxFit _videoFit = BoxFit.contain;
   bool _controlsVisible = true;
 
-  final GlobalKey<SkyStreamPlayerControlsState> _controlsKey = GlobalKey();
+  final GlobalKey<SkyStreamPlayerControlsState> _controlsKeyFinal = GlobalKey();
 
   Timer? _progressTimer;
+  bool _isTv = false;
+  String? _cachedProviderId;
+
+  late final FocusNode _skipFocusNode;
 
   @override
   void initState() {
     super.initState();
+    _skipFocusNode = FocusNode(
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent &&
+            event.logicalKey == LogicalKeyboardKey.arrowUp) {
+          _controlsKeyFinal.currentState?.focusBack();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+    );
     MediaKit.ensureInitialized();
 
     _historyNotifier = ref.read(watchHistoryProvider.notifier);
+    _isTv = ref.read(deviceProfileProvider).asData?.value.isTv ?? false;
+    _cachedProviderId = ref.read(activeProviderStateProvider)?.id;
+
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     WakelockPlus.enable();
 
@@ -674,7 +693,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       if (progress > 1 || isSeries) {
         final pId =
             widget.item.provider ??
-            ref.read(activeProviderStateProvider)?.id ?? // Use ID
+            _cachedProviderId ?? // Use Cached ID
             'Unknown';
         final itemToSave = widget.item.copyWith(provider: pId);
         _historyNotifier.saveProgress(
@@ -700,9 +719,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     TorrentService().stop();
 
     _player.dispose(); // Ensure audio stops
+    _skipFocusNode.dispose();
     WakelockPlus.disable();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+
+    if (_isTv) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    } else {
+      SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    }
     if (!Platform.isAndroid && !Platform.isIOS) {
       try {
         windowManager.setFullScreen(false);
@@ -742,6 +770,39 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   KeyEventResult _handleKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
+    final isTv = ref.read(deviceProfileProvider).asData?.value.isTv ?? false;
+
+    // TV Navigation Logic
+    if (isTv) {
+      // If controls are visible, let the focus system handle navigation and selection
+      if (_controlsVisible) {
+        if (event.logicalKey == LogicalKeyboardKey.arrowUp ||
+            event.logicalKey == LogicalKeyboardKey.arrowDown ||
+            event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+            event.logicalKey == LogicalKeyboardKey.arrowRight ||
+            event.logicalKey == LogicalKeyboardKey.select ||
+            event.logicalKey == LogicalKeyboardKey.enter) {
+          return KeyEventResult.ignored;
+        }
+      } else {
+        // If controls hidden:
+        // Up/Down: Show controls
+        if (event.logicalKey == LogicalKeyboardKey.arrowUp ||
+            event.logicalKey == LogicalKeyboardKey.arrowDown) {
+          setState(() {
+            _controlsVisible = true;
+            _forceShowControls = true;
+          });
+          // Reset force flag after a moment to allow properties to handle visibility
+          Future.delayed(
+            const Duration(milliseconds: 200),
+            () => setState(() => _forceShowControls = false),
+          );
+          return KeyEventResult.handled;
+        }
+      }
+    }
+
     // Intercept standard playback keys
     if (event.logicalKey == LogicalKeyboardKey.space ||
         event.logicalKey == LogicalKeyboardKey.select ||
@@ -760,40 +821,42 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
     // Toggle Mute
     if (event.logicalKey == LogicalKeyboardKey.keyM) {
-      _controlsKey.currentState?.toggleMute();
+      _controlsKeyFinal.currentState?.toggleMute();
       return KeyEventResult.handled;
     }
 
     // Cycle resize modes
     if (event.logicalKey == LogicalKeyboardKey.keyZ) {
-      _controlsKey.currentState?.cycleResize();
+      _controlsKeyFinal.currentState?.cycleResize();
       return KeyEventResult.handled;
     }
 
     // Toggle Fullscreen
     if (event.logicalKey == LogicalKeyboardKey.keyF) {
-      _controlsKey.currentState?.toggleFullscreen();
+      _controlsKeyFinal.currentState?.toggleFullscreen();
       return KeyEventResult.handled;
     }
 
-    // Volume control
-    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-      _controlsKey.currentState?.changeVolume(0.05);
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-      _controlsKey.currentState?.changeVolume(-0.05);
-      return KeyEventResult.handled;
+    // Volume control (Disable on TV)
+    if (!isTv) {
+      if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+        _controlsKeyFinal.currentState?.changeVolume(0.05);
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+        _controlsKeyFinal.currentState?.changeVolume(-0.05);
+        return KeyEventResult.handled;
+      }
     }
 
     // Seek with arrow keys
     if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-      _controlsKey.currentState?.triggerSeek(true);
+      _controlsKeyFinal.currentState?.triggerSeek(true);
       return KeyEventResult.handled;
     }
 
     if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-      _controlsKey.currentState?.triggerSeek(false);
+      _controlsKeyFinal.currentState?.triggerSeek(false);
       return KeyEventResult.handled;
     }
 
@@ -833,88 +896,100 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       );
     }
 
-    return Scaffold(
-      // backgroundColor: Colors.black, // Inherit from Theme (Scaffold is Black)
-      body: MouseRegion(
-        cursor: _controlsVisible
-            ? SystemMouseCursors.basic
-            : SystemMouseCursors.none,
-        onHover: (_) {
-          if (!_controlsVisible) {
-            setState(() => _controlsVisible = true);
-          }
-          _controlsKey.currentState?.onUserInteraction();
-        },
-        child: Focus(
-          autofocus: true,
-          onKeyEvent: _handleKey,
-          child: Stack(
-            children: [
-              Center(
-                child: Video(
-                  controller: _videoController,
-                  fit: _videoFit,
-                  subtitleViewConfiguration: const SubtitleViewConfiguration(
-                    visible: false,
-                  ),
-                  controls: (state) => const SizedBox.shrink(),
-                ),
-              ),
-
-              // Custom Subtitles Position
-              Positioned(
-                bottom: _controlsVisible ? 120 : 20,
-                left: 20,
-                right: 20,
-                child: SubtitleView(
-                  controller: _videoController,
-                  configuration: SubtitleViewConfiguration(
-                    style: TextStyle(
-                      fontSize: ref.watch(playerSettingsProvider).subtitleSize,
-                      color: Color(
-                        ref.watch(playerSettingsProvider).subtitleColor,
-                      ),
-                      backgroundColor: Color(
-                        ref
-                            .watch(playerSettingsProvider)
-                            .subtitleBackgroundColor,
-                      ),
-                      shadows: [
-                        const Shadow(
-                          offset: Offset(0, 1),
-                          blurRadius: 2,
-                          color: Colors.black,
-                        ),
-                      ],
+    return PopScope(
+      canPop: !_controlsVisible,
+      onPopInvoked: (didPop) async {
+        if (didPop) return;
+        if (_controlsVisible) {
+          _controlsKeyFinal.currentState?.hideControls();
+        }
+      },
+      child: Scaffold(
+        // backgroundColor: Colors.black, // Inherit from Theme (Scaffold is Black)
+        body: MouseRegion(
+          cursor: _controlsVisible
+              ? SystemMouseCursors.basic
+              : SystemMouseCursors.none,
+          onHover: (_) {
+            if (!_controlsVisible) {
+              setState(() => _controlsVisible = true);
+            }
+            _controlsKeyFinal.currentState?.onUserInteraction();
+          },
+          child: Focus(
+            autofocus: false,
+            onKeyEvent: _handleKey,
+            child: Stack(
+              children: [
+                Center(
+                  child: Video(
+                    controller: _videoController,
+                    fit: _videoFit,
+                    subtitleViewConfiguration: const SubtitleViewConfiguration(
+                      visible: false,
                     ),
-                    padding: EdgeInsets.zero,
+                    controls: (state) => const SizedBox.shrink(),
                   ),
                 ),
-              ),
 
-              // Custom Controls Overlay
-              SkyStreamPlayerControls(
-                key: _controlsKey,
-                isLoading: _isLoading,
-                forceShowControls: _forceShowControls,
-                player: _player,
-                title: _playerTitle,
-                subtitle: _streamSubtitle,
-                streams: _streams,
-                currentStream: _currentStream,
-                externalSubtitles: _externalSubtitles,
-                torrentStatus: _torrentStatus, // Added
-                onStreamSelected: _changeStream,
-                onTorrentFileSelected: _onTorrentFileSelected,
-                onResize: _updateResizeMode,
-                onVisibilityChanged: (v) {
-                  if (mounted) setState(() => _controlsVisible = v);
-                },
-              ),
+                // Custom Subtitles Position
+                Positioned(
+                  bottom: _controlsVisible ? 120 : 20,
+                  left: 20,
+                  right: 20,
+                  child: SubtitleView(
+                    controller: _videoController,
+                    configuration: SubtitleViewConfiguration(
+                      style: TextStyle(
+                        fontSize: ref
+                            .watch(playerSettingsProvider)
+                            .subtitleSize,
+                        color: Color(
+                          ref.watch(playerSettingsProvider).subtitleColor,
+                        ),
+                        backgroundColor: Color(
+                          ref
+                              .watch(playerSettingsProvider)
+                              .subtitleBackgroundColor,
+                        ),
+                        shadows: [
+                          const Shadow(
+                            offset: Offset(0, 1),
+                            blurRadius: 2,
+                            color: Colors.black,
+                          ),
+                        ],
+                      ),
+                      padding: EdgeInsets.zero,
+                    ),
+                  ),
+                ),
 
-              // Loading overlay on top for interactivity
-              if (_isLoading && !_forceShowControls) _buildSkipButtonOverlay(),
-            ],
+                // Custom Controls Overlay
+                SkyStreamPlayerControls(
+                  key: _controlsKeyFinal,
+                  isLoading: _isLoading,
+                  forceShowControls: _forceShowControls,
+                  player: _player,
+                  title: _playerTitle,
+                  subtitle: _streamSubtitle,
+                  streams: _streams,
+                  currentStream: _currentStream,
+                  externalSubtitles: _externalSubtitles,
+                  torrentStatus: _torrentStatus, // Added
+                  onStreamSelected: _changeStream,
+                  onTorrentFileSelected: _onTorrentFileSelected,
+                  onResize: _updateResizeMode,
+                  onVisibilityChanged: (v) {
+                    if (mounted) setState(() => _controlsVisible = v);
+                  },
+                ),
+
+                // Loading overlay on top for interactivity
+                if (_isLoading && !_forceShowControls)
+                  _buildSkipButtonOverlay(),
+              ],
+            ),
           ),
         ),
       ),
@@ -941,7 +1016,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         behavior: HitTestBehavior.translucent,
         onDoubleTap: () {
           if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
-            _controlsKey.currentState?.toggleFullscreen();
+            _controlsKeyFinal.currentState?.toggleFullscreen();
           }
         },
         child: Stack(
@@ -951,20 +1026,26 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
               left: 0,
               right: 0,
               child: Center(
-                child: _isManualSwitch
-                    ? const SizedBox.shrink()
-                    : ElevatedButton.icon(
-                        onPressed: () =>
-                            setState(() => _forceShowControls = true),
-                        icon: const Icon(Icons.skip_next),
-                        label: Text(
-                          "Skip Loading (${_currentStreamIndex + 1}/${_streams.length})",
+                child: Center(
+                  child: _isManualSwitch
+                      ? const SizedBox.shrink()
+                      : TvButton(
+                          focusNode: _skipFocusNode,
+                          autofocus: true,
+                          onPressed: () =>
+                              setState(() => _forceShowControls = true),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.skip_next),
+                              const SizedBox(width: 8),
+                              Text(
+                                "Skip Loading (${_currentStreamIndex + 1}/${_streams.length})",
+                              ),
+                            ],
+                          ),
                         ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white24,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
+                ),
               ),
             ),
           ],

@@ -11,6 +11,7 @@ import '../../../core/extensions/extension_manager.dart';
 import '../../../../core/providers/device_info_provider.dart';
 import '../../../core/storage/storage_service.dart';
 import '../../library/presentation/history_provider.dart';
+import '../../../../shared/widgets/tv_input_widgets.dart';
 
 class DetailsScreen extends ConsumerStatefulWidget {
   final MultimediaItem item;
@@ -546,37 +547,44 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
     if (_isMovie) {
       final storage = ref.watch(storageServiceProvider);
       final pos = storage.getPosition(widget.item.url);
-      // Threshold: > 5 seconds and < 95% (handled by remove history logic usually, but checks existing)
+      // Threshold: > 5 seconds and < 95%
       if (pos > 5000) isResuming = true;
     }
 
-    final playBtn = FilledButton.icon(
+    final playBtn = TvButton(
+      isPrimary: true,
+      autofocus: true,
       onPressed:
           (details != null &&
               details.episodes != null &&
               details.episodes!.isNotEmpty)
           ? () => _handlePlayPress(context, details)
           : null,
-      icon: const Icon(Icons.play_arrow_rounded),
-      label: Text(isResuming ? 'Resume' : 'Play'),
-      style: FilledButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        minimumSize: const Size(double.infinity, 50),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.play_arrow_rounded),
+          const SizedBox(width: 8),
+          Text(isResuming ? 'Resume' : 'Play'),
+        ],
       ),
     );
 
-    final downloadBtn = OutlinedButton.icon(
+    final downloadBtn = TvButton(
+      isPrimary: false,
+      isOutlined: true,
       onPressed: () {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Coming soon')));
       },
-      icon: const Icon(Icons.download_rounded),
-      label: const Text('Download'),
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        minimumSize: const Size(double.infinity, 50),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.download_rounded),
+          const SizedBox(width: 8),
+          const Text('Download'),
+        ],
       ),
     );
 
@@ -590,25 +598,7 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
       children: [
         Expanded(child: playBtn),
         const SizedBox(width: 12),
-        Expanded(
-          child: FilledButton.icon(
-            onPressed: () {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('Coming soon')));
-            },
-            icon: const Icon(Icons.download_rounded),
-            label: const Text('Download'),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              backgroundColor: Theme.of(
-                context,
-              ).colorScheme.surfaceContainerHigh,
-              foregroundColor: Theme.of(context).colorScheme.onSurface,
-              minimumSize: const Size(double.infinity, 50),
-            ),
-          ),
-        ),
+        Expanded(child: downloadBtn),
       ],
     );
   }

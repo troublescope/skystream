@@ -12,6 +12,8 @@ import '../../../../core/extensions/base_provider.dart';
 import '../../../../core/models/torrent_status.dart'; // Added
 import '../components/torrent_info_widget.dart'; // Added
 import '../../../settings/presentation/player_settings_provider.dart';
+import '../../../../core/providers/device_info_provider.dart';
+import '../../../../shared/widgets/tv_input_widgets.dart';
 
 class SkyStreamPlayerControls extends ConsumerStatefulWidget {
   final Player player;
@@ -57,6 +59,12 @@ class SkyStreamPlayerControls extends ConsumerStatefulWidget {
 class SkyStreamPlayerControlsState
     extends ConsumerState<SkyStreamPlayerControls>
     with SingleTickerProviderStateMixin {
+  final FocusNode _backFocusNode = FocusNode();
+
+  void focusBack() {
+    _backFocusNode.requestFocus();
+  }
+
   static const Map<String, String> _isoLanguages = {
     'af': 'Afrikaans',
     'ar': 'Arabic',
@@ -187,10 +195,12 @@ class SkyStreamPlayerControlsState
   bool _isIpad = false;
   bool _isFullscreen = false;
   bool _isInPip = false;
+  late final FocusNode _playFocusNode;
 
   @override
   void initState() {
     super.initState();
+    _playFocusNode = FocusNode();
     try {
       FlutterVolumeController.updateShowSystemUI(false);
     } catch (e) {
@@ -272,6 +282,30 @@ class SkyStreamPlayerControlsState
         }
       });
     }
+
+    if (widget.forceShowControls) {
+      _isVisible = true;
+    }
+    _startHideTimer();
+    FocusManager.instance.addListener(_onFocusChange);
+  }
+
+  @override
+  void didUpdateWidget(SkyStreamPlayerControls oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.forceShowControls && !oldWidget.forceShowControls) {
+      // Defer state updates to avoid 'setState during build' error
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _isVisible = true;
+          });
+          widget.onVisibilityChanged?.call(true);
+          _startHideTimer();
+          _playFocusNode.requestFocus();
+        }
+      });
+    }
   }
 
   Future<void> _checkIpad() async {
@@ -287,12 +321,15 @@ class SkyStreamPlayerControlsState
 
   @override
   void dispose() {
-    for (var s in _subscriptions) {
+    FocusManager.instance.removeListener(_onFocusChange);
+    _playFocusNode.dispose();
+    _backFocusNode.dispose();
+    _hideTimer?.cancel();
+    _osdTimer?.cancel();
+    _seekAnimController.dispose();
+    for (final s in _subscriptions) {
       s.cancel();
     }
-    _hideTimer?.cancel();
-    _seekAnimController.dispose();
-    _osdTimer?.cancel();
     try {
       ScreenBrightness().resetApplicationScreenBrightness();
     } catch (e) {}
@@ -420,6 +457,28 @@ class SkyStreamPlayerControlsState
     });
     widget.onVisibilityChanged?.call(_isVisible);
     if (_isVisible) {
+      _startHideTimer();
+    }
+  }
+
+  void hideControls() {
+    if (mounted) {
+      _hideTimer?.cancel();
+      setState(() => _isVisible = false);
+      widget.onVisibilityChanged?.call(false);
+    }
+  }
+
+  void showControls() {
+    if (mounted) {
+      setState(() => _isVisible = true);
+      widget.onVisibilityChanged?.call(true);
+      _startHideTimer();
+    }
+  }
+
+  void _onFocusChange() {
+    if (_isVisible && mounted) {
       _startHideTimer();
     }
   }
@@ -940,9 +999,12 @@ class SkyStreamPlayerControlsState
 
     final width = MediaQuery.of(context).size.width;
 
-    // Disable vertical gestures on Desktop
+    // Disable vertical gestures on Desktop and TV
+    final profile = ref.read(deviceProfileProvider).asData?.value;
+    final isTv = profile?.isTv ?? false;
     try {
-      if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) return;
+      if (isTv || Platform.isMacOS || Platform.isWindows || Platform.isLinux)
+        return;
     } catch (_) {}
 
     final x = details.globalPosition.dx;
@@ -1046,9 +1108,12 @@ class SkyStreamPlayerControlsState
     // Check settings
     if (!ref.read(playerSettingsProvider).swipeSeekEnabled) return;
 
-    // Disable touch gestures on desktop
+    // Disable touch gestures on desktop and TV
+    final profile = ref.read(deviceProfileProvider).asData?.value;
+    final isTv = profile?.isTv ?? false;
     try {
-      if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) return;
+      if (isTv || Platform.isMacOS || Platform.isWindows || Platform.isLinux)
+        return;
     } catch (_) {}
 
     // Avoid conflict with seek bar
@@ -1593,11 +1658,10 @@ class SkyStreamPlayerControlsState
     bool rotate = false,
     bool highlight = false,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    return TvButton(
+      onPressed: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1678,15 +1742,16 @@ class SkyStreamPlayerControlsState
                   ),
                   child: Row(
                     children: [
-                      IconButton(
-                        icon: const Icon(
+                      TvButton(
+                        focusNode: _backFocusNode,
+                        onPressed:
+                            widget.onBackPointer ??
+                            () => Navigator.of(context).pop(),
+                        child: const Icon(
                           Icons.arrow_back,
                           color: Colors.white,
                           size: 36,
                         ),
-                        onPressed:
-                            widget.onBackPointer ??
-                            () => Navigator.of(context).pop(),
                       ),
                       Expanded(
                         child: Column(
@@ -1740,47 +1805,50 @@ class SkyStreamPlayerControlsState
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   // Seek Backward
-                  IconButton(
-                    icon: const Icon(
+                  TvButton(
+                    onPressed: () =>
+                        _seekRelative(const Duration(seconds: -10)),
+                    child: const Icon(
                       Icons.replay_10,
                       color: Colors.white,
                       size: 36,
                     ),
-                    onPressed: () =>
-                        _seekRelative(const Duration(seconds: -10)),
                   ),
                   const SizedBox(width: 48),
                   // Play/Pause Toggle
-                  Container(
-                    decoration: const BoxDecoration(
-                      color: Colors.black45, // Slight circle bg
-                      shape: BoxShape.circle,
-                    ),
-                    child: (_isBuffering || widget.isLoading)
-                        ? const Padding(
-                            padding: EdgeInsets.all(16),
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                            ),
-                          )
-                        : IconButton(
-                            iconSize: 64,
-                            icon: Icon(
+                  TvButton(
+                    autofocus: true,
+                    focusNode: _playFocusNode,
+                    onPressed: _togglePlay,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: const BoxDecoration(
+                        color: Colors.black45, // Slight circle bg
+                        shape: BoxShape.circle,
+                      ),
+                      child: (_isBuffering || widget.isLoading)
+                          ? const Padding(
+                              padding: EdgeInsets.all(20.0),
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                              ),
+                            )
+                          : Icon(
                               _isPlaying ? Icons.pause : Icons.play_arrow,
                               color: Colors.white,
+                              size: 64,
                             ),
-                            onPressed: _togglePlay,
-                          ),
+                    ),
                   ),
                   const SizedBox(width: 48),
                   // Seek Forward
-                  IconButton(
-                    icon: const Icon(
+                  TvButton(
+                    onPressed: () => _seekRelative(const Duration(seconds: 10)),
+                    child: const Icon(
                       Icons.forward_10,
                       color: Colors.white,
                       size: 36,
                     ),
-                    onPressed: () => _seekRelative(const Duration(seconds: 10)),
                   ),
                 ],
               ),
@@ -1841,11 +1909,9 @@ class SkyStreamPlayerControlsState
                                 inactiveTrackColor: Colors.grey,
                                 trackShape: const RoundedRectSliderTrackShape(),
                                 thumbColor: Colors.white,
-                                overlayColor: Colors.white.withValues(
-                                  alpha: 0.2,
-                                ),
+                                overlayColor: Colors.white.withOpacity(0.2),
                               ),
-                              child: Slider(
+                              child: TvSlider(
                                 value:
                                     (_dragValue ??
                                             _position.inMilliseconds.toDouble())
@@ -1855,23 +1921,17 @@ class SkyStreamPlayerControlsState
                                         ),
                                 min: 0.0,
                                 max: _duration.inMilliseconds.toDouble(),
-                                onChangeStart: (val) {
-                                  _cancelHideTimer();
-                                  setState(() => _dragValue = val);
-                                },
+                                step: 5000, // 5 seconds step
                                 onChanged: (val) {
-                                  setState(() => _dragValue = val);
-                                },
-                                onChangeEnd: (val) {
+                                  _cancelHideTimer();
                                   widget.player.seek(
                                     Duration(milliseconds: val.toInt()),
                                   );
-                                  setState(() => _dragValue = null);
-                                  _startHideTimer();
                                 },
                               ),
                             ),
                           ),
+
                           SizedBox(
                             width: _duration.inHours > 0 ? 65 : 45,
                             child: Text(
@@ -1890,69 +1950,128 @@ class SkyStreamPlayerControlsState
                       const SizedBox(height: 16),
 
                       // Actions Row
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          if (widget.torrentStatus != null)
-                            _buildActionButton(
-                              icon: Icons.info_outline,
-                              label: "Info",
-                              onTap: () {
-                                setState(
-                                  () => _showTorrentInfo = !_showTorrentInfo,
-                                );
-                              },
-                            ),
-                          _buildActionButton(
-                            icon: Icons.lock_open,
-                            label: "Lock",
-                            onTap: _toggleLock,
-                          ),
-                          _buildActionButton(
-                            icon: Icons.aspect_ratio,
-                            label: "Resize",
-                            onTap: cycleResize,
-                          ),
-                          _buildActionButton(
-                            icon: Icons.playlist_play,
-                            label: "Source",
-                            onTap: _showSourceSelection,
-                          ),
-                          if (_hasMultipleVideoFiles())
-                            _buildActionButton(
-                              icon: Icons.folder_open,
-                              label: "Content",
-                              onTap: _showContentSelection,
-                            ),
-                          _buildActionButton(
-                            icon: Icons.subtitles,
-                            label: "Tracks",
-                            onTap: _showTracksSelection,
-                          ),
-                          if (Platform.isAndroid && !Platform.isIOS)
-                            _buildActionButton(
-                              icon: Icons.picture_in_picture_alt,
-                              label: "PIP",
-                              onTap: _enterPip,
-                            ),
-                          if (Platform.isAndroid ||
-                              (Platform.isIOS && !_isIpad))
-                            _buildActionButton(
-                              icon: Icons.screen_rotation,
-                              label: "Rotate",
-                              onTap: _toggleOrientation,
-                            ),
-                          if (Platform.isMacOS ||
-                              Platform.isWindows ||
-                              Platform.isLinux)
-                            _buildActionButton(
-                              icon: _isFullscreen
-                                  ? Icons.fullscreen_exit
-                                  : Icons.fullscreen,
-                              label: _isFullscreen ? "Windowed" : "Fullscreen",
-                              onTap: toggleFullscreen,
-                            ),
-                        ],
+                      FocusTraversalGroup(
+                        policy: OrderedTraversalPolicy(),
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            return SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  minWidth: constraints.maxWidth,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceEvenly,
+                                  children: [
+                                    if (widget.torrentStatus != null)
+                                      FocusTraversalOrder(
+                                        order: const NumericFocusOrder(1),
+                                        child: _buildActionButton(
+                                          icon: Icons.info_outline,
+                                          label: "Info",
+                                          onTap: () {
+                                            setState(
+                                              () => _showTorrentInfo =
+                                                  !_showTorrentInfo,
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    FocusTraversalOrder(
+                                      order: const NumericFocusOrder(2),
+                                      child: _buildActionButton(
+                                        icon: Icons.lock_open,
+                                        label: "Lock",
+                                        onTap: _toggleLock,
+                                      ),
+                                    ),
+                                    FocusTraversalOrder(
+                                      order: const NumericFocusOrder(3),
+                                      child: _buildActionButton(
+                                        icon: Icons.aspect_ratio,
+                                        label: "Resize",
+                                        onTap: cycleResize,
+                                      ),
+                                    ),
+                                    FocusTraversalOrder(
+                                      order: const NumericFocusOrder(4),
+                                      child: _buildActionButton(
+                                        icon: Icons.playlist_play,
+                                        label: "Source",
+                                        onTap: _showSourceSelection,
+                                      ),
+                                    ),
+                                    if (_hasMultipleVideoFiles())
+                                      FocusTraversalOrder(
+                                        order: const NumericFocusOrder(5),
+                                        child: _buildActionButton(
+                                          icon: Icons.folder_open,
+                                          label: "Content",
+                                          onTap: _showContentSelection,
+                                        ),
+                                      ),
+                                    FocusTraversalOrder(
+                                      order: const NumericFocusOrder(6),
+                                      child: _buildActionButton(
+                                        icon: Icons.subtitles,
+                                        label: "Tracks",
+                                        onTap: _showTracksSelection,
+                                      ),
+                                    ),
+                                    if (Platform.isAndroid &&
+                                        !Platform.isIOS &&
+                                        !(ref
+                                                .read(deviceProfileProvider)
+                                                .asData
+                                                ?.value
+                                                .isTv ??
+                                            false))
+                                      FocusTraversalOrder(
+                                        order: const NumericFocusOrder(7),
+                                        child: _buildActionButton(
+                                          icon: Icons.picture_in_picture_alt,
+                                          label: "PIP",
+                                          onTap: _enterPip,
+                                        ),
+                                      ),
+                                    if ((Platform.isAndroid ||
+                                            (Platform.isIOS && !_isIpad)) &&
+                                        !(ref
+                                                .read(deviceProfileProvider)
+                                                .asData
+                                                ?.value
+                                                .isTv ??
+                                            false))
+                                      FocusTraversalOrder(
+                                        order: const NumericFocusOrder(8),
+                                        child: _buildActionButton(
+                                          icon: Icons.screen_rotation,
+                                          label: "Rotate",
+                                          onTap: _toggleOrientation,
+                                        ),
+                                      ),
+                                    if (Platform.isMacOS ||
+                                        Platform.isWindows ||
+                                        Platform.isLinux)
+                                      FocusTraversalOrder(
+                                        order: const NumericFocusOrder(9),
+                                        child: _buildActionButton(
+                                          icon: _isFullscreen
+                                              ? Icons.fullscreen_exit
+                                              : Icons.fullscreen,
+                                          label: _isFullscreen
+                                              ? "Windowed"
+                                              : "Fullscreen",
+                                          onTap: toggleFullscreen,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                       ),
                       const SizedBox(height: 8),
                     ],
