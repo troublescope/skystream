@@ -428,7 +428,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               maxHeight: MediaQuery.of(context).size.height * 0.6,
             ),
             child: SizedBox(
-              width: double.maxFinite,
+              width: 400, // Fixed width for better appearance on desktop
               child: ListView.builder(
                 controller: scrollController,
                 shrinkWrap: true,

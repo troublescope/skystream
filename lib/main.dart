@@ -28,15 +28,16 @@ void main() async {
   // Native window init (Desktop) - Run once
   if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
     await windowManager.ensureInitialized();
-    
+
     WindowOptions windowOptions = const WindowOptions(
       size: Size(1280, 720),
       center: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: Colors
+          .black, // Solid black prevents transparency during fullscreen transition
       skipTaskbar: false,
       titleBarStyle: TitleBarStyle.normal,
     );
-    
+
     windowManager.waitUntilReadyToShow(windowOptions, () async {
       await windowManager.show();
       await windowManager.focus();
@@ -136,17 +137,18 @@ class MyApp extends ConsumerStatefulWidget {
 }
 
 class _MyAppState extends ConsumerState<MyApp> {
-  final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
-  
+  final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
+      GlobalKey<ScaffoldMessengerState>();
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-       _checkExtensionsUpdates();
-       _checkAppUpdates();
+      _checkExtensionsUpdates();
+      _checkAppUpdates();
     });
   }
-  
+
   Future<void> _checkAppUpdates() async {
     // Delay slightly to not block UI/Animations on launch
     await Future.delayed(const Duration(seconds: 3));
@@ -155,7 +157,7 @@ class _MyAppState extends ConsumerState<MyApp> {
     try {
       final controller = ref.read(updateControllerProvider.notifier);
       await controller.checkForUpdates();
-      
+
       final state = ref.read(updateControllerProvider);
       if (state is UpdateAvailable && mounted) {
         UpdateDialog.show(context, state.release);
@@ -166,27 +168,27 @@ class _MyAppState extends ConsumerState<MyApp> {
   }
 
   Future<void> _checkExtensionsUpdates() async {
-     try {
-       // Wait for initialization if needed, but the provider creates it.
-       // We read the notifier to ensure it's built
-       final controller = ref.read(extensionsControllerProvider.notifier);
-       
-       // Give it a moment to load repos (in _init which is microtask)
-       await Future.delayed(const Duration(seconds: 2)); 
-       
-       final count = await controller.checkForUpdates();
-       if (count > 0 && mounted) {
-          _scaffoldMessengerKey.currentState?.showSnackBar(
-            SnackBar(
-              content: Text("Updated $count extension${count > 1 ? 's' : ''}"),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: Colors.green,
-            ),
-          );
-       }
-     } catch (e) {
-       debugPrint("Auto-update failed: $e");
-     }
+    try {
+      // Wait for initialization if needed, but the provider creates it.
+      // We read the notifier to ensure it's built
+      final controller = ref.read(extensionsControllerProvider.notifier);
+
+      // Give it a moment to load repos (in _init which is microtask)
+      await Future.delayed(const Duration(seconds: 2));
+
+      final count = await controller.checkForUpdates();
+      if (count > 0 && mounted) {
+        _scaffoldMessengerKey.currentState?.showSnackBar(
+          SnackBar(
+            content: Text("Updated $count extension${count > 1 ? 's' : ''}"),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint("Auto-update failed: $e");
+    }
   }
 
   @override

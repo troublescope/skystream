@@ -46,8 +46,8 @@ class _HomeCarouselState extends ConsumerState<HomeCarousel> {
     // Re-create controller if viewport fraction changes (simplified approach)
     // Ideally we track this change, but for simplicity in build:
     if (_pageController.viewportFraction != viewportFraction) {
-       _pageController.dispose();
-       _pageController = PageController(viewportFraction: viewportFraction);
+      _pageController.dispose();
+      _pageController = PageController(viewportFraction: viewportFraction);
     }
 
     return SizedBox(
@@ -57,13 +57,13 @@ class _HomeCarouselState extends ConsumerState<HomeCarousel> {
         scrollAmount: 400, // Fallback
         onScrollLeft: () async {
           await _pageController.previousPage(
-            duration: const Duration(milliseconds: 300), 
+            duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
           );
         },
         onScrollRight: () async {
-           await _pageController.nextPage(
-            duration: const Duration(milliseconds: 300), 
+          await _pageController.nextPage(
+            duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
           );
         },
@@ -85,12 +85,15 @@ class _HomeCarouselState extends ConsumerState<HomeCarousel> {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                       CachedNetworkImage(
+                      CachedNetworkImage(
                         imageUrl: item.bannerUrl ?? item.posterUrl,
                         fit: BoxFit.cover,
                         alignment: Alignment.topCenter,
-                        placeholder: (context, url) => Container(color: Theme.of(context).dividerColor),
-                        errorWidget: (context, url, error) => const Icon(Icons.error),
+                        memCacheWidth: 800, // P15: Optimize memory for banners
+                        placeholder: (context, url) =>
+                            Container(color: Theme.of(context).dividerColor),
+                        errorWidget: (context, url, error) =>
+                            const Icon(Icons.error),
                       ),
                       Container(
                         decoration: BoxDecoration(
@@ -114,18 +117,27 @@ class _HomeCarouselState extends ConsumerState<HomeCarousel> {
                           children: [
                             Text(
                               item.title,
-                              style: isLarge 
-                                ? Theme.of(context).textTheme.displaySmall?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    shadows: [
-                                      Shadow(color: Colors.black.withOpacity(0.8), blurRadius: 8),
-                                    ]
-                                  )
-                                : Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                              style: isLarge
+                                  ? Theme.of(
+                                      context,
+                                    ).textTheme.displaySmall?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      shadows: [
+                                        Shadow(
+                                          color: Colors.black.withValues(
+                                            alpha: 0.8,
+                                          ),
+                                          blurRadius: 8,
+                                        ),
+                                      ],
+                                    )
+                                  : Theme.of(
+                                      context,
+                                    ).textTheme.headlineMedium?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -133,14 +145,15 @@ class _HomeCarouselState extends ConsumerState<HomeCarousel> {
                               SizedBox(height: isLarge ? 12 : 4),
                               Text(
                                 item.description!,
-                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: Colors.white70,
-                                  fontSize: isLarge ? 16 : null,
-                                ),
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(
+                                      color: Colors.white70,
+                                      fontSize: isLarge ? 16 : null,
+                                    ),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                            ]
+                            ],
                           ],
                         ),
                       ),

@@ -161,10 +161,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   static const double _saveThresholdPercent = 0.05; // Save every 5% of progress
 
   void _setupEventDrivenProgressSaving() {
-    // 1. Save when user pauses
+    // 1. Save when user pauses + P11: Control torrent polling
     _player.stream.playing.listen((isPlaying) {
       if (!isPlaying && mounted) {
         _saveProgress();
+        // P11: Pause torrent polling when video paused (save CPU)
+        _torrentPollTimer?.cancel();
+        _torrentPollTimer = null;
+      } else if (isPlaying &&
+          _torrentStatus != null &&
+          _torrentPollTimer == null) {
+        // P11: Resume torrent polling when playing (only if we were in torrent mode)
+        _startTorrentPolling();
       }
     });
 
@@ -946,9 +954,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       child: Scaffold(
         // backgroundColor: Colors.black, // Inherit from Theme (Scaffold is Black)
         body: MouseRegion(
-          cursor: _controlsVisible
-              ? SystemMouseCursors.basic
-              : SystemMouseCursors.none,
+          // Cursor is controlled by SkyStreamPlayerControls to avoid state desync
           onHover: (_) {
             if (!_controlsVisible) {
               setState(() => _controlsVisible = true);
