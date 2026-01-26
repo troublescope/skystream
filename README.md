@@ -41,17 +41,17 @@ SkyStream is a modern, media streaming client. It draws inspiration from the ver
 ## 📱 Mobile
 
 <p align="center">
-  <img src="screenshots/mobile/home.png" width="320" />
-    <img src="screenshots/mobile/discover.png" width="320" />
-  <img src="screenshots/mobile/details.png" width="320" />
-  <img src="screenshots/mobile/settings.png" width="320" />
+  <img src="screenshots/mobile/home.png" width="350" />
+    <img src="screenshots/mobile/discover.png" width="350" />
+  <img src="screenshots/mobile/details.png" width="350" />
+  <img src="screenshots/mobile/settings.png" width="350" />
 </p>
 
 ## 📺 TV
 
 <p align="center">
-  <img src="screenshots/tv/details_1.png" width="600" />
-  <img src="screenshots/tv/details_2.png" width="600" />
+  <img src="screenshots/tv/details_1.png" width="700" />
+  <img src="screenshots/tv/details_2.png" width="700" />
 </p>
 
 ## Supported Platforms
