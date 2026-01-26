@@ -159,8 +159,15 @@ class _MyAppState extends ConsumerState<MyApp> {
       await controller.checkForUpdates();
 
       final state = ref.read(updateControllerProvider);
-      if (state is UpdateAvailable && mounted) {
-        UpdateDialog.show(context, state.release);
+
+      // Use the navigator context to show dialog
+      final appRouter = ref.read(appRouterProvider);
+      final navContext = appRouter.routerDelegate.navigatorKey.currentContext;
+
+      if (state is UpdateAvailable &&
+          navContext != null &&
+          navContext.mounted) {
+        UpdateDialog.show(navContext, state.release);
       }
     } catch (e) {
       debugPrint("App update check failed: $e");
