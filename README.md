@@ -1,9 +1,64 @@
 # SkyStream
 
-![Downloads](https://img.shields.io/github/downloads/akashdh11/skystream/total?style=for-the-badge&color=blue) 
-![Stars](https://img.shields.io/github/stars/akashdh11/skystream?style=for-the-badge&color=red)
-![Latest Release](https://img.shields.io/github/v/release/akashdh11/skystream?style=for-the-badge&color=orange)
-![Open Issues](https://img.shields.io/github/issues/akashdh11/skystream?style=for-the-badge&color=brown)
+<p align="center">
+
+<a href="https://github.com/akashdh11/skystream/releases">
+  <img alt="Downloads" src="https://img.shields.io/github/downloads/akashdh11/skystream/total?style=for-the-badge&color=1f6feb">
+</a>
+
+<a href="https://github.com/akashdh11/skystream/stargazers">
+  <img alt="Stars" src="https://img.shields.io/github/stars/akashdh11/skystream?style=for-the-badge&color=f1c40f">
+</a>
+
+<a href="https://github.com/akashdh11/skystream/releases">
+  <img alt="Latest Release" src="https://img.shields.io/github/v/release/akashdh11/skystream?style=for-the-badge&color=f39c12">
+</a>
+
+<a href="https://github.com/akashdh11/skystream/issues">
+  <img alt="Open Issues" src="https://img.shields.io/github/issues/akashdh11/skystream?style=for-the-badge&color=e74c3c">
+</a>
+
+<a href="https://github.com/akashdh11/skystream/issues?q=is%3Aissue+is%3Aclosed">
+  <img alt="Closed Issues" src="https://img.shields.io/github/issues-search/akashdh11/skystream?query=is%3Aissue+is%3Aclosed&style=for-the-badge&color=2ecc71">
+</a>
+
+<a href="https://github.com/akashdh11/skystream/commits/main">
+  <img alt="Last Commit" src="https://img.shields.io/github/last-commit/akashdh11/skystream?style=for-the-badge&color=17a2b8">
+</a>
+
+</p>
+
+<br>
+
+<p align="center">
+
+<a href="https://opensource.org/">
+  <img alt="Open Source" src="https://img.shields.io/badge/Open_Source-Yes-3498db?style=for-the-badge">
+</a>
+
+<a href="https://github.com/akashdh11/skystream/pulls">
+  <img alt="PRs Welcome" src="https://img.shields.io/badge/PRs-Welcome-27ae60?style=for-the-badge">
+</a>
+
+<img alt="Made for the Community" src="https://img.shields.io/badge/Made_for_the-Community-9b59b6?style=for-the-badge">
+
+</p>
+
+<br>
+
+<p align="center">
+
+<img alt="Android" src="https://img.shields.io/badge/Android-✓-3DDC84?style=for-the-badge&logo=android&logoColor=white">
+<img alt="Android TV" src="https://img.shields.io/badge/Android_TV-✓-34A853?style=for-the-badge&logo=android&logoColor=white">
+<img alt="iOS" src="https://img.shields.io/badge/iOS-✓-000000?style=for-the-badge&logo=apple&logoColor=white">
+<img alt="macOS" src="https://img.shields.io/badge/macOS-✓-000000?style=for-the-badge&logo=apple&logoColor=white">
+<img alt="Windows" src="https://img.shields.io/badge/Windows-✓-0078D6?style=for-the-badge&logo=windows&logoColor=white">
+<img alt="Linux" src="https://img.shields.io/badge/Linux-✓-FCC624?style=for-the-badge&logo=linux&logoColor=black">
+
+</p>
+
+
+
 
 
 **⚠️ Warning: By default, this app doesn't provide any video sources; you have to install extensions to add functionality to the app.**
