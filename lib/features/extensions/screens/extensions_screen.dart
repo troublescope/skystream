@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/extensions/models/extension_plugin.dart';
+import '../../../core/providers/device_info_provider.dart';
 import '../../../shared/widgets/tv_input_widgets.dart';
 import '../providers/extensions_controller.dart';
 
@@ -310,6 +311,8 @@ class _ExtensionsScreenState extends ConsumerState<ExtensionsScreen> {
 
   void _showAddRepoDialog(BuildContext context, WidgetRef ref) {
     final controller = TextEditingController();
+    final isTv = ref.read(deviceProfileProvider).asData?.value.isTv ?? false;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -323,6 +326,7 @@ class _ExtensionsScreenState extends ConsumerState<ExtensionsScreen> {
         ),
         actions: [
           TvButton(
+            showFocusHighlight: isTv,
             onPressed: () => Navigator.pop(context),
             child: Text(
               "Cancel",
@@ -335,6 +339,7 @@ class _ExtensionsScreenState extends ConsumerState<ExtensionsScreen> {
           TvButton(
             autofocus: true,
             isPrimary: true,
+            showFocusHighlight: isTv,
             onPressed: () {
               if (controller.text.isNotEmpty) {
                 ref

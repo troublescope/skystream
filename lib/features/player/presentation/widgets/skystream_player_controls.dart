@@ -684,28 +684,44 @@ class SkyStreamPlayerControlsState
                   itemBuilder: (ctx, index) {
                     final s = widget.streams![index];
                     final isSelected = s == widget.currentStream;
-                    return ListTile(
-                      leading: Icon(
-                        Icons.high_quality,
-                        color: isSelected
-                            ? theme.colorScheme.primary
-                            : theme.iconTheme.color,
-                      ),
-                      title: Text(
-                        s.quality,
-                        style: TextStyle(
-                          color: isSelected
-                              ? theme.colorScheme.primary
-                              : theme.textTheme.bodyMedium?.color,
-                        ),
-                      ),
-                      trailing: isSelected
-                          ? Icon(Icons.check, color: theme.colorScheme.primary)
-                          : null,
-                      onTap: () {
+                    return TvButton(
+                      showFocusHighlight: _isTv,
+                      onPressed: () {
                         Navigator.pop(ctx);
                         widget.onStreamSelected?.call(s);
                       },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.high_quality,
+                              color: isSelected
+                                  ? theme.colorScheme.primary
+                                  : theme.iconTheme.color,
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Text(
+                                s.quality,
+                                style: TextStyle(
+                                  color: isSelected
+                                      ? theme.colorScheme.primary
+                                      : theme.textTheme.bodyMedium?.color,
+                                ),
+                              ),
+                            ),
+                            if (isSelected)
+                              Icon(
+                                Icons.check,
+                                color: theme.colorScheme.primary,
+                              ),
+                          ],
+                        ),
+                      ),
                     );
                   },
                 ),
@@ -785,34 +801,56 @@ class SkyStreamPlayerControlsState
                           path.toLowerCase().endsWith(".avi") ||
                           path.toLowerCase().endsWith(".mov");
 
-                      return ListTile(
-                        leading: Icon(
-                          isVideo
-                              ? Icons.movie_creation_outlined
-                              : Icons.insert_drive_file_outlined,
-                          color: isVideo
-                              ? theme.colorScheme.primary
-                              : theme.iconTheme.color,
-                        ),
-                        title: Text(
-                          path.split('/').last, // Show filename only
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: theme.textTheme.bodyMedium?.color,
-                          ),
-                        ),
-                        subtitle: Text(
-                          _formatBytes(length),
-                          style: TextStyle(
-                            color: theme.textTheme.bodySmall?.color,
-                          ),
-                        ),
-                        onTap: () {
+                      return TvButton(
+                        showFocusHighlight: _isTv,
+                        onPressed: () {
                           Navigator.pop(ctx);
                           // Only allow switching to video files or let user try any file
                           widget.onTorrentFileSelected?.call(id);
                         },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                isVideo
+                                    ? Icons.movie_creation_outlined
+                                    : Icons.insert_drive_file_outlined,
+                                color: isVideo
+                                    ? theme.colorScheme.primary
+                                    : theme.iconTheme.color,
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      path
+                                          .split('/')
+                                          .last, // Show filename only
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color:
+                                            theme.textTheme.bodyMedium?.color,
+                                      ),
+                                    ),
+                                    Text(
+                                      _formatBytes(length),
+                                      style: TextStyle(
+                                        color: theme.textTheme.bodySmall?.color,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       );
                     },
                   ),
@@ -866,22 +904,32 @@ class SkyStreamPlayerControlsState
                       : langName;
                   final isSelected = e == widget.player.state.track.audio;
 
-                  return ListTile(
-                    title: Text(
-                      label,
-                      style: TextStyle(
-                        color: theme.textTheme.bodyMedium?.color,
-                      ),
-                    ),
-                    onTap: () {
+                  return TvButton(
+                    showFocusHighlight: _isTv,
+                    onPressed: () {
                       widget.player.setAudioTrack(e);
                       Navigator.pop(ctx);
                     },
-                    selected: isSelected,
-                    selectedColor: theme.colorScheme.primary,
-                    trailing: isSelected
-                        ? Icon(Icons.check, color: theme.colorScheme.primary)
-                        : null,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              label,
+                              style: TextStyle(
+                                color: theme.textTheme.bodyMedium?.color,
+                              ),
+                            ),
+                          ),
+                          if (isSelected)
+                            Icon(Icons.check, color: theme.colorScheme.primary),
+                        ],
+                      ),
+                    ),
                   );
                 }),
                 if (audioTracks.isEmpty)
@@ -900,21 +948,33 @@ class SkyStreamPlayerControlsState
                   ),
                 ),
                 Divider(color: theme.dividerColor),
-                ListTile(
-                  title: Text(
-                    "Off",
-                    style: TextStyle(color: theme.textTheme.bodyMedium?.color),
-                  ),
-                  onTap: () {
+                TvButton(
+                  showFocusHighlight: _isTv,
+                  onPressed: () {
                     widget.player.setSubtitleTrack(SubtitleTrack.no());
                     Navigator.pop(ctx);
                   },
-                  selected:
-                      widget.player.state.track.subtitle == SubtitleTrack.no(),
-                  trailing:
-                      widget.player.state.track.subtitle == SubtitleTrack.no()
-                      ? Icon(Icons.check, color: theme.colorScheme.primary)
-                      : null,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            "Off",
+                            style: TextStyle(
+                              color: theme.textTheme.bodyMedium?.color,
+                            ),
+                          ),
+                        ),
+                        if (widget.player.state.track.subtitle ==
+                            SubtitleTrack.no())
+                          Icon(Icons.check, color: theme.colorScheme.primary),
+                      ],
+                    ),
+                  ),
                 ),
                 // External Subtitles
                 if (widget.externalSubtitles != null)
@@ -929,31 +989,48 @@ class SkyStreamPlayerControlsState
                         widget.player.state.track.subtitle.id == s.url ||
                         widget.player.state.track.subtitle.title == s.label;
 
-                    return ListTile(
-                      title: Text(
-                        s.label,
-                        style: TextStyle(
-                          color: theme.textTheme.bodyMedium?.color,
-                        ),
-                      ),
-                      subtitle: s.lang != null
-                          ? Text(
-                              _getLanguageName(s.lang!),
-                              style: TextStyle(
-                                color: theme.textTheme.bodySmall?.color,
-                                fontSize: 10,
-                              ),
-                            )
-                          : null,
-                      onTap: () {
+                    return TvButton(
+                      showFocusHighlight: _isTv,
+                      onPressed: () {
                         widget.player.setSubtitleTrack(uriTrack);
                         Navigator.pop(ctx);
                       },
-                      selected: isSelected,
-                      selectedColor: theme.colorScheme.primary,
-                      trailing: isSelected
-                          ? Icon(Icons.check, color: theme.colorScheme.primary)
-                          : null,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    s.label,
+                                    style: TextStyle(
+                                      color: theme.textTheme.bodyMedium?.color,
+                                    ),
+                                  ),
+                                  if (s.lang != null)
+                                    Text(
+                                      _getLanguageName(s.lang!),
+                                      style: TextStyle(
+                                        color: theme.textTheme.bodySmall?.color,
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            if (isSelected)
+                              Icon(
+                                Icons.check,
+                                color: theme.colorScheme.primary,
+                              ),
+                          ],
+                        ),
+                      ),
                     );
                   }),
 
@@ -965,22 +1042,32 @@ class SkyStreamPlayerControlsState
                       : langName;
                   final isSelected = e == widget.player.state.track.subtitle;
 
-                  return ListTile(
-                    title: Text(
-                      label,
-                      style: TextStyle(
-                        color: theme.textTheme.bodyMedium?.color,
-                      ),
-                    ),
-                    onTap: () {
+                  return TvButton(
+                    showFocusHighlight: _isTv,
+                    onPressed: () {
                       widget.player.setSubtitleTrack(e);
                       Navigator.pop(ctx);
                     },
-                    selected: isSelected,
-                    selectedColor: theme.colorScheme.primary,
-                    trailing: isSelected
-                        ? Icon(Icons.check, color: theme.colorScheme.primary)
-                        : null,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              label,
+                              style: TextStyle(
+                                color: theme.textTheme.bodyMedium?.color,
+                              ),
+                            ),
+                          ),
+                          if (isSelected)
+                            Icon(Icons.check, color: theme.colorScheme.primary),
+                        ],
+                      ),
+                    ),
                   );
                 }),
               ],

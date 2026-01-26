@@ -1034,15 +1034,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         showFocusHighlight: _isTv, // Only highlight on TV
                         onPressed: () =>
                             setState(() => _forceShowControls = true),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.skip_next),
-                            const SizedBox(width: 8),
-                            Text(
-                              "Skip Loading (${_currentStreamIndex + 1}/${_streams.length})",
-                            ),
-                          ],
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.skip_next),
+                              const SizedBox(width: 8),
+                              Text(
+                                "Skip Loading (${_currentStreamIndex + 1}/${_streams.length})",
+                              ),
+                            ],
+                          ),
                         ),
                       ),
               ),
