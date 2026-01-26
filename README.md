@@ -56,13 +56,14 @@ SkyStream is a modern, media streaming client. It draws inspiration from the ver
 
 ## Supported Platforms
 
-| Platform | Support |
-| :--- | :---: |
-| **Android** | ✅ |
-| **iOS** | ✅ (Sideloading required)|
-| **Windows** | ✅ |
-| **macOS** | ✅ |
-| **Linux** | ✅ |
+| Platform       |         Support          |
+|:---------------|:------------------------:|
+| **Android**    |            ✅             |
+| **Android TV** |         ✅ (Beta)         |
+| **iOS**        | ✅ (Sideloading required) |
+| **Windows**    |            ✅             |
+| **macOS**      |            ✅             |
+| **Linux**      |         ✅ (Beta)         |
 
 ## ✨ Key Features
 
