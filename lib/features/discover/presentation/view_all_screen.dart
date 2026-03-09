@@ -5,6 +5,7 @@ import '../../../../core/config/tmdb_config.dart';
 import '../../details/presentation/tmdb_movie_details_screen.dart';
 import '../../../../shared/widgets/tv_cards_wrapper.dart';
 import '../../../../shared/widgets/shimmer_placeholder.dart';
+import '../../../../core/utils/responsive_breakpoints.dart';
 import '../data/tmdb_provider.dart';
 import '../data/language_provider.dart';
 import '../data/filter_provider.dart';
@@ -195,9 +196,9 @@ class _ViewAllScreenState extends ConsumerState<ViewAllScreen> {
   @override
   Widget build(BuildContext context) {
     // Calculate aspect ratio for 2:3 posters
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > 800;
+    final isDesktop = context.isDesktop;
     final maxExtent = isDesktop ? 240.0 : 150.0;
+    final screenWidth = MediaQuery.of(context).size.width;
     final crossAxisCount = (screenWidth / maxExtent).ceil();
     const childAspectRatio = 0.55;
 

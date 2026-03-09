@@ -9,8 +9,10 @@ import 'package:version/version.dart';
 
 import '../data/models/github_release.dart';
 
+import '../network/dio_client_provider.dart';
+
 final updateServiceProvider = Provider<UpdateService>((ref) {
-  return UpdateService(Dio());
+  return UpdateService(ref.watch(dioClientProvider));
 });
 
 class UpdateService {

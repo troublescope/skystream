@@ -3,8 +3,10 @@ import '../../../core/services/tmdb_service.dart';
 import 'language_provider.dart';
 import 'filter_provider.dart';
 
+import '../../../core/network/dio_client_provider.dart';
+
 final tmdbServiceProvider = Provider<TmdbService>((ref) {
-  return TmdbService();
+  return TmdbService(ref.watch(dioClientProvider));
 });
 
 final genresProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {

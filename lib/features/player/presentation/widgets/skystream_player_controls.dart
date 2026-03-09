@@ -12,7 +12,8 @@ import '../../../../core/models/torrent_status.dart';
 import '../components/torrent_info_widget.dart';
 import '../../../settings/presentation/player_settings_provider.dart';
 import '../../../../core/providers/device_info_provider.dart';
-import '../../../../shared/widgets/tv_input_widgets.dart';
+import '../../../../shared/widgets/tv_input_widgets.dart'; // Import Tv-specific Button
+import '../../../../core/utils/responsive_breakpoints.dart'; // Responsive context extensionsream_widgets.dart';
 import 'player_stream_widgets.dart';
 import 'player_control_components.dart';
 import '../player_platform_service.dart';
@@ -408,7 +409,8 @@ class SkyStreamPlayerControlsState
   void _handleDoubleTap() async {
     // Desktop Double Tap -> Toggle Fullscreen
     try {
-      if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+      if (context.isDesktop &&
+          (Platform.isMacOS || Platform.isWindows || Platform.isLinux)) {
         toggleFullscreen();
         return;
       }

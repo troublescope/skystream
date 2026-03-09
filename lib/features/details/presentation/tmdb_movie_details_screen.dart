@@ -12,6 +12,7 @@ import 'widgets/provider_search_section.dart';
 import '../../../shared/widgets/desktop_scroll_wrapper.dart';
 import '../../../shared/widgets/tv_cards_wrapper.dart'; // Import TvCardsWrapper
 import '../../../shared/widgets/shimmer_placeholder.dart';
+import '../../../../core/utils/responsive_breakpoints.dart';
 import '../data/tmdb_details_provider.dart';
 import 'tmdb_details_controller.dart';
 
@@ -102,7 +103,7 @@ class _TmdbMovieDetailsScreenState
               ),
             );
           }
-          if (MediaQuery.of(context).size.width > 900) {
+          if (context.isDesktop) {
             return _buildDesktopLayout(data);
           }
           return _buildMobileLayout(data);

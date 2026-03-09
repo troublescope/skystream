@@ -40,6 +40,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   bool _isTv = false;
   late final FocusNode _skipFocusNode;
 
+  late final PlayerController _playerController;
+
   @override
   void initState() {
     super.initState();
@@ -78,10 +80,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       }
     }, fireImmediately: true);
 
+    _playerController = ref.read(playerControllerProvider.notifier);
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref
-          .read(playerControllerProvider.notifier)
-          .init(player: _player, item: widget.item, videoUrl: widget.videoUrl);
+      _playerController.init(
+        player: _player,
+        item: widget.item,
+        videoUrl: widget.videoUrl,
+      );
     });
   }
 
@@ -90,7 +96,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.hidden) {
-      ref.read(playerControllerProvider.notifier).saveProgress();
+      _playerController.saveProgress();
     }
   }
 
@@ -110,7 +116,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    ref.read(playerControllerProvider.notifier).disposeController();
+    _playerController.disposeController();
 
     _player.dispose();
     _skipFocusNode.dispose();

@@ -1,10 +1,7 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:filesystem_picker/filesystem_picker.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:virtual_mouse/virtual_mouse.dart';
 
 import '../../extensions/providers/extensions_controller.dart';
@@ -128,28 +125,11 @@ class _DeveloperOptionsScreenState
   }
 
   Future<void> _pickLocalVideo(BuildContext context) async {
-    // Request Permissions for Direct Access
-    if (!await Permission.manageExternalStorage.isGranted) {
-      await Permission.manageExternalStorage.request();
-    }
-    if (!await Permission.storage.isGranted) {
-      await Permission.storage.request();
-    }
+    final result = await FilePicker.platform.pickFiles(type: FileType.video);
 
-    if (!context.mounted) return;
-
-    // Open Direct File Browser
-    final String? path = await FilesystemPicker.open(
-      title: 'Select Video',
-      context: context,
-      rootDirectory: Directory('/storage/emulated/0'),
-      fsType: FilesystemType.file,
-      allowedExtensions: ['.mp4', '.mkv', '.avi', '.mov', '.webm', '.flv'],
-      fileTileSelectMode: FileTileSelectMode.wholeTile,
-    );
-
-    if (path != null && context.mounted) {
-      final name = path.split('/').last; // Extract filename
+    if (result != null && result.files.single.path != null && context.mounted) {
+      final path = result.files.single.path!;
+      final name = result.files.single.name;
 
       context.push(
         '/player',

@@ -4,34 +4,25 @@ import '../config/tmdb_config.dart';
 class TmdbService {
   final Dio _dio;
 
-  TmdbService()
-    : _dio = Dio(
-        BaseOptions(
-          baseUrl: TmdbConfig.baseUrl,
-          connectTimeout: const Duration(seconds: 10),
-          receiveTimeout: const Duration(seconds: 10),
-          sendTimeout: const Duration(seconds: 10),
-        ),
-      );
+  TmdbService(Dio baseDio)
+    : _dio = Dio(baseDio.options.copyWith(baseUrl: TmdbConfig.baseUrl)) {
+    _dio.interceptors.addAll(baseDio.interceptors);
+  }
 
   Future<List<Map<String, dynamic>>> getGenres({
     String language = 'en-US',
   }) async {
-    try {
-      final response = await _dio.get(
-        '/genre/movie/list',
-        queryParameters: {
-          'api_key': TmdbConfig.apiKey,
-          'language': language,
-        }, // Always English per user request
-      );
-      if (response.statusCode == 200) {
-        return List<Map<String, dynamic>>.from(response.data['genres']);
-      }
-      return [];
-    } catch (e) {
-      return [];
+    final response = await _dio.get(
+      '/genre/movie/list',
+      queryParameters: {
+        'api_key': TmdbConfig.apiKey,
+        'language': language,
+      }, // Always English per user request
+    );
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(response.data['genres']);
     }
+    return [];
   }
 
   // Use discovery endpoint to enforce filters (e.g. valid release dates)
@@ -268,151 +259,145 @@ class TmdbService {
     String language = 'en-US',
     int page = 1,
   }) async {
-    try {
-      // --- Advanced Search Parsing ---
-      String cleanQuery = query;
-      int? filterYear;
-      String? filterLanguageCode;
+    // --- Advanced Search Parsing ---
+    String cleanQuery = query;
+    int? filterYear;
+    String? filterLanguageCode;
 
-      // 1. Extract Year (e.g., "2023", "(2023)")
-      // Matches 19xx or 20xx surrounded by word boundaries
-      final yearRegex = RegExp(r'\b(19|20)\d{2}\b');
-      final yearMatch = yearRegex.firstMatch(cleanQuery);
-      if (yearMatch != null) {
-        filterYear = int.tryParse(yearMatch.group(0)!);
-        // Remove year from query to improve search relevance
+    // 1. Extract Year (e.g., "2023", "(2023)")
+    // Matches 19xx or 20xx surrounded by word boundaries
+    final yearRegex = RegExp(r'\b(19|20)\d{2}\b');
+    final yearMatch = yearRegex.firstMatch(cleanQuery);
+    if (yearMatch != null) {
+      filterYear = int.tryParse(yearMatch.group(0)!);
+      // Remove year from query to improve search relevance
+      cleanQuery = cleanQuery
+          .replaceAll(yearMatch.group(0)!, '')
+          .replaceAll('()', '')
+          .trim();
+    }
+
+    // 2. Extract Language (e.g., "Kannada", "Tamil")
+    final languageMap = {
+      'kannada': 'kn',
+      'tamil': 'ta',
+      'telugu': 'te',
+      'hindi': 'hi',
+      'malayalam': 'ml',
+      'english': 'en',
+      'korean': 'ko',
+      'japanese': 'ja',
+    };
+
+    for (final key in languageMap.keys) {
+      if (cleanQuery.toLowerCase().contains(key)) {
+        filterLanguageCode = languageMap[key];
+        // Remove language name using case-insensitive replace
         cleanQuery = cleanQuery
-            .replaceAll(yearMatch.group(0)!, '')
-            .replaceAll('()', '')
+            .replaceAll(RegExp(key, caseSensitive: false), '')
             .trim();
+        break; // Assume single language filter
       }
+    }
 
-      // 2. Extract Language (e.g., "Kannada", "Tamil")
-      final languageMap = {
-        'kannada': 'kn',
-        'tamil': 'ta',
-        'telugu': 'te',
-        'hindi': 'hi',
-        'malayalam': 'ml',
-        'english': 'en',
-        'korean': 'ko',
-        'japanese': 'ja',
-      };
+    // If query became empty (e.g. user just typed "2023"), revert to original but keep filters
+    if (cleanQuery.isEmpty) cleanQuery = query;
 
-      for (final key in languageMap.keys) {
-        if (cleanQuery.toLowerCase().contains(key)) {
-          filterLanguageCode = languageMap[key];
-          // Remove language name using case-insensitive replace
-          cleanQuery = cleanQuery
-              .replaceAll(RegExp(key, caseSensitive: false), '')
-              .trim();
-          break; // Assume single language filter
-        }
-      }
+    // Clean up double spaces
+    cleanQuery = cleanQuery.replaceAll(RegExp(r'\s+'), ' ');
 
-      // If query became empty (e.g. user just typed "2023"), revert to original but keep filters
-      if (cleanQuery.isEmpty) cleanQuery = query;
+    final response = await _dio.get(
+      '/search/multi',
+      queryParameters: {
+        'api_key': TmdbConfig.apiKey,
+        'language': language,
+        'query': cleanQuery,
+        'page': page,
+        'include_adult': false,
+      },
+    );
 
-      // Clean up double spaces
-      cleanQuery = cleanQuery.replaceAll(RegExp(r'\s+'), ' ');
-
-      final response = await _dio.get(
-        '/search/multi',
-        queryParameters: {
-          'api_key': TmdbConfig.apiKey,
-          'language': language,
-          'query': cleanQuery,
-          'page': page,
-          'include_adult': false,
-        },
+    if (response.statusCode == 200) {
+      final rawResults = List<Map<String, dynamic>>.from(
+        response.data['results'],
       );
 
-      if (response.statusCode == 200) {
-        final rawResults = List<Map<String, dynamic>>.from(
-          response.data['results'],
-        );
+      final List<Map<String, dynamic>> processedResults = [];
 
-        final List<Map<String, dynamic>> processedResults = [];
+      // Process results to handle 'person' type and flatten 'known_for'
+      for (final item in rawResults) {
+        final mediaType = item['media_type'];
 
-        // Process results to handle 'person' type and flatten 'known_for'
-        for (final item in rawResults) {
-          final mediaType = item['media_type'];
-
-          if (mediaType == 'person') {
-            // Hero Search: Extract movies from person's known_for
-            if (item['known_for'] != null) {
-              final knownFor = List<Map<String, dynamic>>.from(
-                item['known_for'],
-              );
-              for (final known in knownFor) {
-                // known_for items often miss media_type, infer if possible or default to movie
-                known['media_type'] ??= 'movie';
-                processedResults.add(known);
-              }
+        if (mediaType == 'person') {
+          // Hero Search: Extract movies from person's known_for
+          if (item['known_for'] != null) {
+            final knownFor = List<Map<String, dynamic>>.from(item['known_for']);
+            for (final known in knownFor) {
+              // known_for items often miss media_type, infer if possible or default to movie
+              known['media_type'] ??= 'movie';
+              processedResults.add(known);
             }
-          } else if (mediaType == 'movie' || mediaType == 'tv') {
-            processedResults.add(item);
           }
+        } else if (mediaType == 'movie' || mediaType == 'tv') {
+          processedResults.add(item);
         }
-        final today = DateTime.now();
+      }
+      final today = DateTime.now();
 
-        final finalResults = processedResults.where((item) {
-          final mediaType = item['media_type'];
-          if (mediaType != 'movie' && mediaType != 'tv') return false;
+      final finalResults = processedResults.where((item) {
+        final mediaType = item['media_type'];
+        if (mediaType != 'movie' && mediaType != 'tv') return false;
 
-          // --- Filter 1: Release Status (Existing logic) ---
-          String? dateStr;
-          if (mediaType == 'movie') {
-            dateStr = item['release_date'];
-          } else if (mediaType == 'tv') {
-            dateStr = item['first_air_date'];
-          }
-          if (dateStr == null || dateStr.isEmpty) return false;
+        // --- Filter 1: Release Status (Existing logic) ---
+        String? dateStr;
+        if (mediaType == 'movie') {
+          dateStr = item['release_date'];
+        } else if (mediaType == 'tv') {
+          dateStr = item['first_air_date'];
+        }
+        if (dateStr == null || dateStr.isEmpty) return false;
 
-          // --- Filter 2: Year (New) ---
-          if (filterYear != null) {
-            try {
-              final date = DateTime.parse(dateStr);
-              // Allow +/- 1 year tolerance or exact match
-              // Actually strict year match is better for "Mark 2025"
-              if (date.year != filterYear) return false;
-            } catch (_) {
-              return false;
-            }
-          }
-
-          // --- Filter 3: Language (New) ---
-          if (filterLanguageCode != null) {
-            final originalLang = item['original_language'];
-            if (originalLang != filterLanguageCode) return false;
-          }
-
-          // Future date check
+        // --- Filter 2: Year (New) ---
+        if (filterYear != null) {
           try {
             final date = DateTime.parse(dateStr);
-            return date.isBefore(today);
-          } catch (e) {
+            // Allow +/- 1 year tolerance or exact match
+            // Actually strict year match is better for "Mark 2025"
+            if (date.year != filterYear) return false;
+          } catch (_) {
             return false;
-          }
-        }).toList();
-
-        // Deduplicate results based on ID (Person's known_for might duplicate direct search results)
-        final seenParams = <String>{}; // unique key: id + type
-        final uniqueResults = <Map<String, dynamic>>[];
-        for (final item in finalResults) {
-          final key = '${item['id']}_${item['media_type']}';
-          if (!seenParams.contains(key)) {
-            seenParams.add(key);
-            uniqueResults.add(item);
           }
         }
 
-        return uniqueResults;
+        // --- Filter 3: Language (New) ---
+        if (filterLanguageCode != null) {
+          final originalLang = item['original_language'];
+          if (originalLang != filterLanguageCode) return false;
+        }
+
+        // Future date check
+        try {
+          final date = DateTime.parse(dateStr);
+          return date.isBefore(today);
+        } catch (e) {
+          return false;
+        }
+      }).toList();
+
+      // Deduplicate results based on ID (Person's known_for might duplicate direct search results)
+      final seenParams = <String>{}; // unique key: id + type
+      final uniqueResults = <Map<String, dynamic>>[];
+      for (final item in finalResults) {
+        final key = '${item['id']}_${item['media_type']}';
+        if (!seenParams.contains(key)) {
+          seenParams.add(key);
+          uniqueResults.add(item);
+        }
       }
-      return [];
-    } catch (e) {
-      return [];
+
+      return uniqueResults;
     }
+    return [];
   }
 
   Future<List<Map<String, dynamic>>> _getDiscoveryResults(
@@ -425,42 +410,38 @@ class TmdbService {
     double? minRating,
     int page = 1,
   }) async {
-    try {
-      final isoCode = fullLanguageCode.split('-')[0];
-      final today = DateTime.now().toString().split(' ')[0];
-      final isMovie = path.contains('movie');
+    final isoCode = fullLanguageCode.split('-')[0];
+    final today = DateTime.now().toString().split(' ')[0];
+    final isMovie = path.contains('movie');
 
-      final query = <String, dynamic>{
-        'api_key': TmdbConfig.apiKey,
-        'language': 'en-US', // Always show titles in English per user request
-        'sort_by': sortBy,
-        'page': page,
-        'include_null_first_air_dates': false,
-        'vote_count.gte': 100, // Basic filter to avoid garbage with 1 vote
-        // Content Filter: Original Language
-        if (fullLanguageCode != 'en-US') 'with_original_language': isoCode,
-        // Content Filter: Released Only (Fix for user request)
-        if (isMovie) 'release_date.lte': today,
-        if (!isMovie) 'first_air_date.lte': today,
-        ...?additionalParams,
-      };
+    final query = <String, dynamic>{
+      'api_key': TmdbConfig.apiKey,
+      'language': 'en-US', // Always show titles in English per user request
+      'sort_by': sortBy,
+      'page': page,
+      'include_null_first_air_dates': false,
+      'vote_count.gte': 100, // Basic filter to avoid garbage with 1 vote
+      // Content Filter: Original Language
+      if (fullLanguageCode != 'en-US') 'with_original_language': isoCode,
+      // Content Filter: Released Only (Fix for user request)
+      if (isMovie) 'release_date.lte': today,
+      if (!isMovie) 'first_air_date.lte': today,
+      ...?additionalParams,
+    };
 
-      // Add nullable filters
-      if (genreId != null) query['with_genres'] = genreId;
-      if (year != null) {
-        query[isMovie ? 'primary_release_year' : 'first_air_date_year'] = year;
-      }
-      if (minRating != null) query['vote_average.gte'] = minRating;
-
-      final response = await _dio.get(path, queryParameters: query);
-
-      if (response.statusCode == 200) {
-        return List<Map<String, dynamic>>.from(response.data['results']);
-      }
-      return [];
-    } catch (e) {
-      return [];
+    // Add nullable filters
+    if (genreId != null) query['with_genres'] = genreId;
+    if (year != null) {
+      query[isMovie ? 'primary_release_year' : 'first_air_date_year'] = year;
     }
+    if (minRating != null) query['vote_average.gte'] = minRating;
+
+    final response = await _dio.get(path, queryParameters: query);
+
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(response.data['results']);
+    }
+    return [];
   }
 
   /// Helper to reduce boilerplate
@@ -469,22 +450,18 @@ class TmdbService {
     String language = 'en-US',
     int page = 1,
   }) async {
-    try {
-      final response = await _dio.get(
-        path,
-        queryParameters: {
-          'api_key': TmdbConfig.apiKey,
-          'language': language,
-          'page': page,
-        },
-      );
-      if (response.statusCode == 200) {
-        return List<Map<String, dynamic>>.from(response.data['results']);
-      }
-      return [];
-    } catch (e) {
-      return [];
+    final response = await _dio.get(
+      path,
+      queryParameters: {
+        'api_key': TmdbConfig.apiKey,
+        'language': language,
+        'page': page,
+      },
+    );
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(response.data['results']);
     }
+    return [];
   }
 
   Future<String?> getBestLogo(
@@ -492,24 +469,20 @@ class TmdbService {
     String language = 'en',
     String mediaType = 'movie',
   }) async {
-    try {
-      final response = await _dio.get(
-        '/$mediaType/$id/images',
-        queryParameters: {
-          'api_key': TmdbConfig.apiKey,
-          'include_image_language': '$language,null,en',
-        },
-      );
+    final response = await _dio.get(
+      '/$mediaType/$id/images',
+      queryParameters: {
+        'api_key': TmdbConfig.apiKey,
+        'include_image_language': '$language,null,en',
+      },
+    );
 
-      if (response.statusCode == 200) {
-        final data = response.data;
-        final logos = List<Map<String, dynamic>>.from(data['logos'] ?? []);
-        return pickBestLogo(logos, language);
-      }
-      return null;
-    } catch (e) {
-      return null;
+    if (response.statusCode == 200) {
+      final data = response.data;
+      final logos = List<Map<String, dynamic>>.from(data['logos'] ?? []);
+      return pickBestLogo(logos, language);
     }
+    return null;
   }
 
   /// Reusable logic to pick the best logo from a list of TMDB logo objects.
@@ -596,24 +569,20 @@ class TmdbService {
     int movieId, {
     String language = 'en-US',
   }) async {
-    try {
-      final response = await _dio.get(
-        '/movie/$movieId',
-        queryParameters: {
-          'api_key': TmdbConfig.apiKey,
-          'language': language,
-          'append_to_response':
-              'credits,videos,images,release_dates,translations',
-          'include_image_language': '$language,null,en',
-        },
-      );
-      if (response.statusCode == 200) {
-        return response.data;
-      }
-      return null;
-    } catch (e) {
-      return null;
+    final response = await _dio.get(
+      '/movie/$movieId',
+      queryParameters: {
+        'api_key': TmdbConfig.apiKey,
+        'language': language,
+        'append_to_response':
+            'credits,videos,images,release_dates,translations',
+        'include_image_language': '$language,null,en',
+      },
+    );
+    if (response.statusCode == 200) {
+      return response.data;
     }
+    return null;
   }
 
   /// Helper to fetch specific credits if not using append_to_response
@@ -621,42 +590,34 @@ class TmdbService {
     int movieId, {
     String language = 'en-US',
   }) async {
-    try {
-      final response = await _dio.get(
-        '/movie/$movieId/credits',
-        queryParameters: {'api_key': TmdbConfig.apiKey, 'language': language},
-      );
-      if (response.statusCode == 200) {
-        return response.data;
-      }
-      return null;
-    } catch (e) {
-      return null;
+    final response = await _dio.get(
+      '/movie/$movieId/credits',
+      queryParameters: {'api_key': TmdbConfig.apiKey, 'language': language},
+    );
+    if (response.statusCode == 200) {
+      return response.data;
     }
+    return null;
   }
 
   Future<Map<String, dynamic>?> getTvDetails(
     int tvId, {
     String language = 'en-US',
   }) async {
-    try {
-      final response = await _dio.get(
-        '/tv/$tvId',
-        queryParameters: {
-          'api_key': TmdbConfig.apiKey,
-          'language': language,
-          'append_to_response':
-              'credits,videos,images,content_ratings,translations',
-          'include_image_language': '$language,null,en',
-        },
-      );
-      if (response.statusCode == 200) {
-        return response.data;
-      }
-      return null;
-    } catch (e) {
-      return null;
+    final response = await _dio.get(
+      '/tv/$tvId',
+      queryParameters: {
+        'api_key': TmdbConfig.apiKey,
+        'language': language,
+        'append_to_response':
+            'credits,videos,images,content_ratings,translations',
+        'include_image_language': '$language,null,en',
+      },
+    );
+    if (response.statusCode == 200) {
+      return response.data;
     }
+    return null;
   }
 
   Future<Map<String, dynamic>?> getTvSeasonDetails(
@@ -664,17 +625,13 @@ class TmdbService {
     int seasonNumber, {
     String language = 'en-US',
   }) async {
-    try {
-      final response = await _dio.get(
-        '/tv/$tvId/season/$seasonNumber',
-        queryParameters: {'api_key': TmdbConfig.apiKey, 'language': language},
-      );
-      if (response.statusCode == 200) {
-        return response.data;
-      }
-      return null;
-    } catch (e) {
-      return null;
+    final response = await _dio.get(
+      '/tv/$tvId/season/$seasonNumber',
+      queryParameters: {'api_key': TmdbConfig.apiKey, 'language': language},
+    );
+    if (response.statusCode == 200) {
+      return response.data;
     }
+    return null;
   }
 }

@@ -152,7 +152,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
                   onTap: () {
                     showSearch(
                       context: context,
-                      delegate: DiscoverSearchDelegate(ref), // Updated
+                      delegate: DiscoverSearchDelegate(), // Updated
                     );
                   },
                   borderRadius: BorderRadius.circular(50),
@@ -286,10 +286,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
             // Title Placeholder
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.0),
-              child: ShimmerPlaceholder.rectangular(
-                width: 150,
-                height: 24,
-              ),
+              child: ShimmerPlaceholder.rectangular(width: 150, height: 24),
             ),
             const SizedBox(height: 16),
             // List Placeholder
@@ -311,7 +308,10 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const ShimmerPlaceholder.rectangular(width: 100, height: 14),
+                    const ShimmerPlaceholder.rectangular(
+                      width: 100,
+                      height: 14,
+                    ),
                   ],
                 ),
               ),

@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'services/plugin_storage_service.dart';
 import 'services/repository_service.dart';
 
+import '../network/dio_client_provider.dart';
+
 // Dio Instance
 final dioProvider = Provider<Dio>((ref) {
-  return Dio();
+  return ref.watch(dioClientProvider);
 });
 
 // Repository Service Provider

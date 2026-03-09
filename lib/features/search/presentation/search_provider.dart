@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/extensions/extension_manager.dart';
 import '../../../../core/domain/entity/multimedia_item.dart';
@@ -18,7 +19,7 @@ class ProviderSearchResult {
 
 /// Shared search orchestration — the single source of truth for provider
 /// fan-out, result mapping, and prefix filtering. Returns results
-/// incrementally as each provider completes.
+/// incrementally as each provider completes natively concurrently.
 Stream<List<ProviderSearchResult>> searchAllProviders(
   String query,
   ExtensionManager manager,
@@ -34,66 +35,78 @@ Stream<List<ProviderSearchResult>> searchAllProviders(
   final queryLower = query.toLowerCase();
   final queryParts = queryLower.split(' ').where((s) => s.isNotEmpty).toList();
 
+  final controller = StreamController<List<ProviderSearchResult>>();
+  int activeFutures = providers.length;
+
   for (final provider in providers) {
-    try {
-      final rawResults = await provider.search(query);
+    Future(() async {
+      try {
+        final rawResults = await provider.search(query);
 
-      final providerResults = rawResults
-          .map(
-            (item) => MultimediaItem(
-              title: item.title,
-              url: item.url,
-              posterUrl: item.posterUrl,
-              bannerUrl: item.bannerUrl,
-              description: item.description,
-              isFolder: item.isFolder,
-              episodes: item.episodes,
-              provider: provider.id,
-            ),
-          )
-          .toList();
-
-      final filtered = providerResults.where((item) {
-        final titleLower = item.title.toLowerCase();
-        final titleParts = titleLower
-            .split(' ')
-            .where((s) => s.isNotEmpty)
+        final providerResults = rawResults
+            .map(
+              (item) => MultimediaItem(
+                title: item.title,
+                url: item.url,
+                posterUrl: item.posterUrl,
+                bannerUrl: item.bannerUrl,
+                description: item.description,
+                isFolder: item.isFolder,
+                episodes: item.episodes,
+                provider: provider.id,
+              ),
+            )
             .toList();
 
-        for (final qPart in queryParts) {
-          bool foundPrefix = false;
-          for (final tPart in titleParts) {
-            if (tPart.startsWith(qPart)) {
-              foundPrefix = true;
-              break;
+        final filtered = providerResults.where((item) {
+          final titleLower = item.title.toLowerCase();
+          final titleParts = titleLower
+              .split(' ')
+              .where((s) => s.isNotEmpty)
+              .toList();
+
+          for (final qPart in queryParts) {
+            bool foundPrefix = false;
+            for (final tPart in titleParts) {
+              if (tPart.startsWith(qPart)) {
+                foundPrefix = true;
+                break;
+              }
             }
+            if (!foundPrefix) return false;
           }
-          if (!foundPrefix) return false;
+          return true;
+        }).toList();
+
+        results.add(
+          ProviderSearchResult(
+            providerId: provider.id,
+            providerName: provider.name,
+            results: filtered,
+          ),
+        );
+      } catch (e) {
+        results.add(
+          ProviderSearchResult(
+            providerId: provider.id,
+            providerName: provider.name,
+            results: [],
+            error: e.toString(),
+          ),
+        );
+      } finally {
+        if (!controller.isClosed) {
+          controller.add(List.from(results));
         }
-        return true;
-      }).toList();
-
-      results.add(
-        ProviderSearchResult(
-          providerId: provider.id,
-          providerName: provider.name,
-          results: filtered,
-        ),
-      );
-
-      yield List.from(results);
-    } catch (e) {
-      results.add(
-        ProviderSearchResult(
-          providerId: provider.id,
-          providerName: provider.name,
-          results: [],
-          error: e.toString(),
-        ),
-      );
-      yield List.from(results);
-    }
+        activeFutures--;
+        if (activeFutures == 0 && !controller.isClosed) {
+          controller.close();
+        }
+      }
+    }); // Spawns Future concurrently
   }
+
+  yield* controller.stream;
 }
 
 // State for the search query

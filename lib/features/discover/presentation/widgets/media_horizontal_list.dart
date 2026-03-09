@@ -4,6 +4,7 @@ import '../../../../core/config/tmdb_config.dart';
 import '../../../details/presentation/tmdb_movie_details_screen.dart';
 import '../../../../shared/widgets/desktop_scroll_wrapper.dart'; // Import DesktopScrollWrapper
 import '../../../../shared/widgets/tv_cards_wrapper.dart'; // Import TvCardsWrapper
+import '../../../../core/utils/responsive_breakpoints.dart';
 import '../../../../shared/widgets/shimmer_placeholder.dart';
 import '../view_all_screen.dart'; // Import ViewAllScreen
 
@@ -48,8 +49,7 @@ class _MediaHorizontalListState extends State<MediaHorizontalList> {
   Widget build(BuildContext context) {
     if (widget.mediaList.isEmpty) return const SizedBox.shrink();
 
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > 800;
+    final isDesktop = context.isDesktop;
     final cardWidth = isDesktop ? 200.0 : 130.0;
     final listHeight = isDesktop ? 350.0 : 230.0;
 

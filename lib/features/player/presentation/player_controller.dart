@@ -88,6 +88,12 @@ class PlayerController extends Notifier<PlayerState> {
   Duration _lastSavedPosition = Duration.zero;
   static const double _saveThresholdPercent = 0.05; // 5% of video
 
+  // Subscriptions to prevent leaks
+  StreamSubscription? _videoParamsSub;
+  StreamSubscription? _errorSub;
+  StreamSubscription? _playingSub;
+  StreamSubscription? _positionSub;
+
   @override
   PlayerState build() {
     return const PlayerState();
@@ -98,6 +104,7 @@ class PlayerController extends Notifier<PlayerState> {
     required MultimediaItem item,
     required String videoUrl,
   }) async {
+    state = const PlayerState(); // Reset stale state
     _player = player;
     _item = item;
     _videoUrl = videoUrl;
@@ -143,7 +150,7 @@ class PlayerController extends Notifier<PlayerState> {
   }
 
   void _setupVideoParamsListener() {
-    _player.stream.videoParams.listen((args) {
+    _videoParamsSub = _player.stream.videoParams.listen((args) {
       if (args.w != null && args.w! > 0) {
         if (state.isLoading) {
           state = state.copyWith(isLoading: false);
@@ -153,7 +160,7 @@ class PlayerController extends Notifier<PlayerState> {
   }
 
   void _setupErrorListener() {
-    _player.stream.error.listen((error) {
+    _errorSub = _player.stream.error.listen((error) {
       debugPrint("Player Error: $error");
       if (state.isOpeningStream) return;
       if (error.toString().toLowerCase().contains("abort")) return;
@@ -169,7 +176,7 @@ class PlayerController extends Notifier<PlayerState> {
   }
 
   void _setupEventDrivenProgressSaving() {
-    _player.stream.playing.listen((isPlaying) {
+    _playingSub = _player.stream.playing.listen((isPlaying) {
       if (!isPlaying) {
         saveProgress();
         _torrentPollTimer?.cancel();
@@ -181,7 +188,7 @@ class PlayerController extends Notifier<PlayerState> {
       }
     });
 
-    _player.stream.position.listen((pos) {
+    _positionSub = _player.stream.position.listen((pos) {
       final duration = _player.state.duration;
       if (duration == Duration.zero) return;
 
@@ -567,8 +574,18 @@ class PlayerController extends Notifier<PlayerState> {
 
   Future<void> disposeController() async {
     _torrentPollTimer?.cancel();
+    _torrentPollTimer = null;
+
+    _videoParamsSub?.cancel();
+    _errorSub?.cancel();
+    _playingSub?.cancel();
+    _positionSub?.cancel();
+
     saveProgress();
     TorrentService().stop();
+    Future.microtask(() {
+      state = const PlayerState();
+    });
   }
 
   String _getProviderDisplayName(String providerName) {

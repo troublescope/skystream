@@ -7,26 +7,28 @@ import 'package:dio/dio.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart';
 import 'package:cookie_jar/cookie_jar.dart';
 import '../../storage/storage_service.dart';
-import '../../network/doh_service.dart';
 import '../../network/cloudflare_bypass.dart';
 import 'package:encrypt/encrypt.dart' as encrypt_lib;
 
-final jsEngineProvider = Provider<JsEngineService>((ref) {
+import '../../network/dio_client_provider.dart';
+
+final jsEngineProvider = Provider.autoDispose<JsEngineService>((ref) {
   final storage = ref.read(storageServiceProvider);
-  final service = JsEngineService(storage);
+  final dio = ref.read(dioClientProvider);
+  final service = JsEngineService(storage, dio);
   ref.onDispose(() => service.dispose());
   return service;
 });
 
 class JsEngineService {
   late JavascriptRuntime _runtime;
-  final Dio _dio = Dio();
+  final Dio _dio;
   final CookieJar _cookieJar = CookieJar(); // RAM-based cookie jar
   final StorageService _storage;
 
-  JsEngineService(this._storage) {
+  JsEngineService(this._storage, this._dio) {
     _dio.interceptors.add(CookieManager(_cookieJar));
-    _dio.interceptors.add(DohInterceptor()); // DNS over HTTPS
+    // DohInterceptor is provided globally by dioClientProvider
     _runtime = getJavascriptRuntime();
     // Defer polyfill injection to avoid blocking the UI thread
     Future.microtask(() => _initPolyfills());
@@ -203,7 +205,7 @@ class JsEngineService {
           : null;
       final dynamic body = req['body'];
 
-      print("[JS HTTP] $method $url ($requestId)");
+      debugPrint("[JS HTTP] $method $url ($requestId)");
 
       final response = await _dio.request(
         url,
@@ -216,7 +218,7 @@ class JsEngineService {
         ),
       );
 
-      print("[JS HTTP] Back $url ($requestId) -> ${response.statusCode}");
+      debugPrint("[JS HTTP] Back $url ($requestId) -> ${response.statusCode}");
 
       // --- Cloudflare Bypass ---
       final responseHeaders = response.headers.map.map(

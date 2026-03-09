@@ -218,19 +218,31 @@ class StorageService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
 
-      // Delete Hive Boxes (Library, History)
+      // Delete Hive Boxes (Library, History, Settings, Extensions)
       try {
+        if (_libraryBox.isOpen) await _libraryBox.close();
         await Hive.deleteBoxFromDisk(kLibraryBox);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Error deleting library box: $e');
+      }
       try {
+        if (_settingsBox.isOpen) await _settingsBox.close();
         await Hive.deleteBoxFromDisk(kSettingsBox);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Error deleting settings box: $e');
+      }
       try {
+        if (_historyBox.isOpen) await _historyBox.close();
         await Hive.deleteBoxFromDisk(kHistoryBox);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Error deleting history box: $e');
+      }
       try {
+        if (_extensionsBox.isOpen) await _extensionsBox.close();
         await Hive.deleteBoxFromDisk(kExtensionsBox);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Error deleting extensions box: $e');
+      }
     } catch (e) {
       debugPrint('Error clearing preferences: $e');
     }

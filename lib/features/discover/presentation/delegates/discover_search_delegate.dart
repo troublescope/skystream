@@ -1,17 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'dart:async';
 
 import '../../../../core/config/tmdb_config.dart';
 import '../../../../shared/widgets/shimmer_placeholder.dart';
 import '../../../details/presentation/tmdb_movie_details_screen.dart';
-import '../../data/tmdb_provider.dart';
+import '../controllers/discover_search_controller.dart';
 
 class DiscoverSearchDelegate extends SearchDelegate {
-  final WidgetRef ref;
-
-  DiscoverSearchDelegate(this.ref)
+  DiscoverSearchDelegate()
     : super(
         searchFieldLabel: 'Search movies, tv shows...',
         searchFieldStyle: const TextStyle(color: Colors.white70, fontSize: 18),
@@ -67,80 +64,55 @@ class DiscoverSearchDelegate extends SearchDelegate {
   Widget buildResults(BuildContext context) {
     if (query.length < 2) return const SizedBox.shrink();
 
-    return _SearchResultsGrid(query: query, ref: ref);
+    return _SearchResultsGrid(query: query);
   }
 
   @override
   Widget buildSuggestions(BuildContext context) {
     if (query.length < 2) return const SizedBox.shrink();
 
-    return _SearchSuggestionsList(query: query, ref: ref);
+    return _SearchSuggestionsList(query: query);
   }
 }
 
-class _SearchSuggestionsList extends StatefulWidget {
+class _SearchSuggestionsList extends ConsumerStatefulWidget {
   final String query;
-  final WidgetRef ref;
 
-  const _SearchSuggestionsList({required this.query, required this.ref});
+  const _SearchSuggestionsList({required this.query});
 
   @override
-  State<_SearchSuggestionsList> createState() => _SearchSuggestionsListState();
+  ConsumerState<_SearchSuggestionsList> createState() =>
+      _SearchSuggestionsListState();
 }
 
-class _SearchSuggestionsListState extends State<_SearchSuggestionsList> {
-  List<Map<String, dynamic>> _suggestions = [];
-  Timer? _debounce;
-  bool _isLoading = false;
-
+class _SearchSuggestionsListState
+    extends ConsumerState<_SearchSuggestionsList> {
   @override
   void initState() {
     super.initState();
-    _fetchSuggestions();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref
+          .read(discoverSearchControllerProvider.notifier)
+          .onQueryChanged(widget.query);
+    });
   }
 
   @override
   void didUpdateWidget(covariant _SearchSuggestionsList oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.query != widget.query) {
-      _fetchSuggestions();
+      ref
+          .read(discoverSearchControllerProvider.notifier)
+          .onQueryChanged(widget.query);
     }
-  }
-
-  void _fetchSuggestions() {
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
-
-    setState(() => _isLoading = true);
-
-    _debounce = Timer(const Duration(milliseconds: 500), () async {
-      try {
-        final tmdb = widget.ref.read(tmdbServiceProvider);
-        final results = await tmdb.multiSearch(
-          query: widget.query,
-          language: 'en-US',
-        );
-
-        if (mounted) {
-          setState(() {
-            _suggestions = results.take(10).toList(); // Show top 10 suggestions
-            _isLoading = false;
-          });
-        }
-      } catch (e) {
-        if (mounted) setState(() => _isLoading = false);
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
+    final searchState = ref.watch(discoverSearchControllerProvider);
+    final isLoading = searchState.isLoading;
+    final suggestions = searchState.suggestions;
+    if (isLoading) {
       return Center(
         child: CircularProgressIndicator(
           color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
@@ -148,21 +120,23 @@ class _SearchSuggestionsListState extends State<_SearchSuggestionsList> {
       );
     }
 
-    if (_suggestions.isEmpty) {
+    if (suggestions.isEmpty) {
       return Center(
         child: Text(
           'No results found',
           style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.5),
           ),
         ),
       );
     }
 
     return ListView.builder(
-      itemCount: _suggestions.length,
+      itemCount: suggestions.length,
       itemBuilder: (context, index) {
-        final item = _suggestions[index];
+        final item = suggestions[index];
         final title = item['title'] ?? item['name'] ?? 'Unknown';
         final year = (item['release_date'] ?? item['first_air_date'] ?? '')
             .split('-')
@@ -195,7 +169,9 @@ class _SearchSuggestionsListState extends State<_SearchSuggestionsList> {
           subtitle: Text(
             '$mediaType ${year.isNotEmpty ? '($year)' : ''}',
             style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.6),
               fontSize: 12,
             ),
           ),
@@ -218,9 +194,8 @@ class _SearchSuggestionsListState extends State<_SearchSuggestionsList> {
 
 class _SearchResultsGrid extends ConsumerStatefulWidget {
   final String query;
-  final WidgetRef ref;
 
-  const _SearchResultsGrid({required this.query, required this.ref});
+  const _SearchResultsGrid({required this.query});
 
   @override
   ConsumerState<_SearchResultsGrid> createState() => _SearchResultsGridState();
@@ -228,74 +203,32 @@ class _SearchResultsGrid extends ConsumerStatefulWidget {
 
 class _SearchResultsGridState extends ConsumerState<_SearchResultsGrid> {
   final ScrollController _scrollController = ScrollController();
-  List<Map<String, dynamic>> _results = [];
-  bool _isLoading = false;
-  int _page = 1;
-  bool _hasMore = true;
 
   @override
   void initState() {
     super.initState();
-    _fetchResults();
     _scrollController.addListener(_onScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref
+          .read(discoverSearchControllerProvider.notifier)
+          .fetchResults(widget.query);
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _SearchResultsGrid oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.query != widget.query) {
+      ref
+          .read(discoverSearchControllerProvider.notifier)
+          .fetchResults(widget.query);
+    }
   }
 
   void _onScroll() {
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 200) {
-      _fetchNextPage();
-    }
-  }
-
-  Future<void> _fetchResults() async {
-    setState(() => _isLoading = true);
-    try {
-      final tmdb = ref.read(tmdbServiceProvider);
-      final results = await tmdb.multiSearch(
-        query: widget.query,
-        language: 'en-US',
-        page: 1,
-      );
-
-      if (mounted) {
-        setState(() {
-          _results = results;
-          _isLoading = false;
-          _hasMore = results.isNotEmpty;
-        });
-      }
-    } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _fetchNextPage() async {
-    if (_isLoading || !_hasMore) return;
-
-    setState(() => _isLoading = true);
-
-    try {
-      final tmdb = ref.read(tmdbServiceProvider);
-      final nextPage = _page + 1;
-      final results = await tmdb.multiSearch(
-        query: widget.query,
-        language: 'en-US',
-        page: nextPage,
-      );
-
-      if (mounted) {
-        setState(() {
-          if (results.isEmpty) {
-            _hasMore = false;
-          } else {
-            _results.addAll(results);
-            _page = nextPage;
-          }
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
+      ref.read(discoverSearchControllerProvider.notifier).fetchNextPage();
     }
   }
 
@@ -307,7 +240,10 @@ class _SearchResultsGridState extends ConsumerState<_SearchResultsGrid> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading && _results.isEmpty) {
+    final searchState = ref.watch(discoverSearchControllerProvider);
+    final isLoading = searchState.isLoading;
+    final results = searchState.results;
+    if (isLoading && results.isEmpty) {
       final screenWidth = MediaQuery.of(context).size.width;
       final isDesktop = screenWidth > 800;
       final maxExtent = isDesktop ? 240.0 : 150.0;
@@ -335,7 +271,7 @@ class _SearchResultsGridState extends ConsumerState<_SearchResultsGrid> {
       );
     }
 
-    if (_results.isEmpty) {
+    if (results.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -343,13 +279,17 @@ class _SearchResultsGridState extends ConsumerState<_SearchResultsGrid> {
             Icon(
               Icons.search_off,
               size: 60,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.3),
             ),
             const SizedBox(height: 16),
             Text(
               "No results found for \"${widget.query}\"",
               style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.6),
                 fontSize: 16,
               ),
             ),
@@ -372,13 +312,13 @@ class _SearchResultsGridState extends ConsumerState<_SearchResultsGrid> {
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
       ),
-      itemCount: _results.length + (_isLoading ? 1 : 0),
+      itemCount: results.length + (isLoading ? 1 : 0),
       itemBuilder: (context, index) {
-        if (index >= _results.length) {
+        if (index >= results.length) {
           return const ShimmerPlaceholder();
         }
 
-        final item = _results[index];
+        final item = results[index];
         final posterPath = item['poster_path'];
         final imageUrl = posterPath != null
             ? '${TmdbConfig.posterSizeUrl}$posterPath'
