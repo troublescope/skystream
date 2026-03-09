@@ -22,7 +22,7 @@ class TmdbService {
         '/genre/movie/list',
         queryParameters: {
           'api_key': TmdbConfig.apiKey,
-          'language': 'en-US',
+          'language': language,
         }, // Always English per user request
       );
       if (response.statusCode == 200) {

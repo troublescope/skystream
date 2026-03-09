@@ -31,7 +31,7 @@ class CursorPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return true;
+  bool shouldRepaint(covariant CursorPainter oldDelegate) {
+    return oldDelegate.color != color || oldDelegate.angle != angle;
   }
 }

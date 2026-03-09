@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/material.dart';
@@ -7,56 +6,14 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/config/tmdb_config.dart';
 import '../../../core/services/tmdb_service.dart';
-import '../../discover/data/tmdb_provider.dart';
+
 import '../../discover/data/language_provider.dart';
 import 'widgets/provider_search_section.dart';
 import '../../../shared/widgets/desktop_scroll_wrapper.dart';
 import '../../../shared/widgets/tv_cards_wrapper.dart'; // Import TvCardsWrapper
 import '../../../shared/widgets/shimmer_placeholder.dart';
-
-class MovieDetailsParams {
-  final int id;
-  final String type; // 'movie' or 'tv'
-  MovieDetailsParams(this.id, this.type);
-
-  @override
-  bool operator ==(Object other) =>
-      other is MovieDetailsParams && other.id == id && other.type == type;
-
-  @override
-  int get hashCode => Object.hash(id, type);
-}
-
-final movieDetailsProvider =
-    FutureProvider.family<Map<String, dynamic>?, MovieDetailsParams>((
-      ref,
-      params,
-    ) async {
-      final service = ref.watch(tmdbServiceProvider);
-      final language = ref.watch(languageProvider);
-
-      // Wrap in timeout to prevent infinite loading when connection is stale
-      // This ensures error UI is shown instead of forever-loading spinner
-      try {
-        if (params.type == 'tv') {
-          return await service
-              .getTvDetails(params.id, language: language)
-              .timeout(
-                const Duration(seconds: 15),
-                onTimeout: () => throw TimeoutException('Request timed out'),
-              );
-        } else {
-          return await service
-              .getMovieDetails(params.id, language: language)
-              .timeout(
-                const Duration(seconds: 15),
-                onTimeout: () => throw TimeoutException('Request timed out'),
-              );
-        }
-      } on TimeoutException {
-        rethrow; // Let error handler show retry UI
-      }
-    });
+import '../data/tmdb_details_provider.dart';
+import 'tmdb_details_controller.dart';
 
 class TmdbMovieDetailsScreen extends ConsumerStatefulWidget {
   final int movieId;
@@ -83,9 +40,6 @@ class _TmdbMovieDetailsScreenState
   late ScrollController _scrollController;
   final ValueNotifier<bool> _showAppBarTitle = ValueNotifier<bool>(false);
 
-  int _selectedSeason = 1;
-
-  Future<Map<String, dynamic>?>? _episodesFuture;
   late final ScrollController _castScrollController;
   late final ScrollController _trailerScrollController;
 
@@ -102,22 +56,11 @@ class _TmdbMovieDetailsScreenState
     _scrollController.addListener(_onScroll);
     if (widget.mediaType == 'tv') {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _fetchEpisodes(1);
+        ref
+            .read(tmdbDetailsControllerProvider.notifier)
+            .fetchEpisodes(widget.movieId, 1);
       });
     }
-  }
-
-  void _fetchEpisodes(int season) {
-    setState(() {
-      _selectedSeason = season;
-      _episodesFuture = ref
-          .read(tmdbServiceProvider)
-          .getTvSeasonDetails(
-            widget.movieId,
-            season,
-            language: ref.read(languageProvider),
-          );
-    });
   }
 
   @override
@@ -303,7 +246,7 @@ class _TmdbMovieDetailsScreenState
     final images = data['images'];
     if (images != null) {
       final logos = List<Map<String, dynamic>>.from(images['logos'] ?? []);
-      final language = ref.read(languageProvider);
+      final language = ref.read(languageProvider).asData?.value ?? 'en-US';
       logoUrl = TmdbService.pickBestLogo(logos, language);
     }
 
@@ -628,7 +571,9 @@ class _TmdbMovieDetailsScreenState
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: DropdownButton<int>(
-                            value: _selectedSeason,
+                            value: ref
+                                .watch(tmdbDetailsControllerProvider)
+                                .selectedSeason,
                             dropdownColor: isDark
                                 ? Colors.grey[900]
                                 : Colors.white,
@@ -644,7 +589,13 @@ class _TmdbMovieDetailsScreenState
                               );
                             }).toList(),
                             onChanged: (val) {
-                              if (val != null) _fetchEpisodes(val);
+                              if (val != null) {
+                                ref
+                                    .read(
+                                      tmdbDetailsControllerProvider.notifier,
+                                    )
+                                    .fetchEpisodes(widget.movieId, val);
+                              }
                             },
                           ),
                         ),
@@ -674,8 +625,7 @@ class _TmdbMovieDetailsScreenState
                           controller: _castScrollController,
                           scrollDirection: Axis.horizontal,
                           itemCount: cast.length,
-                          separatorBuilder: (_, _) =>
-                              const SizedBox(width: 16),
+                          separatorBuilder: (_, _) => const SizedBox(width: 16),
                           itemBuilder: (context, index) {
                             final actor = cast[index];
                             final p = actor['profile_path'];
@@ -754,8 +704,7 @@ class _TmdbMovieDetailsScreenState
                           controller: _trailerScrollController,
                           scrollDirection: Axis.horizontal,
                           itemCount: trailers.length,
-                          separatorBuilder: (_, _) =>
-                              const SizedBox(width: 16),
+                          separatorBuilder: (_, _) => const SizedBox(width: 16),
                           itemBuilder: (context, index) {
                             final video = trailers[index];
                             final key = video['key'];
@@ -814,8 +763,7 @@ class _TmdbMovieDetailsScreenState
                           clipBehavior: Clip.none,
                           scrollDirection: Axis.horizontal,
                           itemCount: productionCompanies.length,
-                          separatorBuilder: (_, _) =>
-                              const SizedBox(width: 24),
+                          separatorBuilder: (_, _) => const SizedBox(width: 24),
                           itemBuilder: (context, index) {
                             final c = productionCompanies[index];
                             final logo = c['logo_path'];
@@ -839,7 +787,9 @@ class _TmdbMovieDetailsScreenState
                             }
                             return Chip(
                               label: Text(c['name']),
-                              backgroundColor: textSecondary.withValues(alpha: 0.1),
+                              backgroundColor: textSecondary.withValues(
+                                alpha: 0.1,
+                              ),
                               labelStyle: TextStyle(
                                 color: textColor,
                                 fontSize: 14,
@@ -957,9 +907,11 @@ class _TmdbMovieDetailsScreenState
   }
 
   Widget _buildDesktopEpisodesList() {
-    if (_episodesFuture == null) return const SizedBox.shrink();
+    if (ref.watch(tmdbDetailsControllerProvider).episodesFuture == null) {
+      return const SizedBox.shrink();
+    }
     return FutureBuilder<Map<String, dynamic>?>(
-      future: _episodesFuture,
+      future: ref.watch(tmdbDetailsControllerProvider).episodesFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return SizedBox(
@@ -1042,9 +994,10 @@ class _TmdbMovieDetailsScreenState
                   child: Container(
                     width: 300,
                     decoration: BoxDecoration(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                      color: Theme.of(context)
+                          .colorScheme
+                          .surfaceContainerHighest
+                          .withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     clipBehavior: Clip.antiAlias,
@@ -1113,9 +1066,8 @@ class _TmdbMovieDetailsScreenState
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurface.withValues(alpha: 0.7),
+                                  color: Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.7),
                                   fontSize: 12,
                                 ),
                               ),
@@ -1240,7 +1192,7 @@ class _TmdbMovieDetailsScreenState
       final logos = List<Map<String, dynamic>>.from(images['logos'] ?? []);
       // Ensure consistent logic with Dashboard
       // We can iterate logos and cast them correctly
-      final language = ref.read(languageProvider);
+      final language = ref.read(languageProvider).asData?.value ?? 'en-US';
       logoUrl = TmdbService.pickBestLogo(logos, language);
     }
 
@@ -1345,9 +1297,8 @@ class _TmdbMovieDetailsScreenState
                             Theme.of(
                               context,
                             ).scaffoldBackgroundColor.withValues(alpha: 0.0),
-                            Theme.of(
-                              context,
-                            ).scaffoldBackgroundColor.withValues(alpha: 0.8), // Fog
+                            Theme.of(context).scaffoldBackgroundColor
+                                .withValues(alpha: 0.8), // Fog
                             Theme.of(
                               context,
                             ).scaffoldBackgroundColor, // Bottom solid
@@ -1418,9 +1369,8 @@ class _TmdbMovieDetailsScreenState
                                     : (isMovie ? 'Movie' : 'TV Show'),
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurface.withValues(alpha: 0.7),
+                                  color: Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.7),
                                   fontSize: 16,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -1673,9 +1623,10 @@ class _TmdbMovieDetailsScreenState
                                   textAlign: TextAlign.center,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurface.withValues(alpha: 0.6),
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.6),
                                     fontSize: 11,
                                   ),
                                 ),
@@ -1736,8 +1687,7 @@ class _TmdbMovieDetailsScreenState
                             fit: BoxFit.contain,
                             width: 100,
                             placeholder: (_, _) => const SizedBox.shrink(),
-                            errorWidget: (_, _, _) =>
-                                const SizedBox.shrink(),
+                            errorWidget: (_, _, _) => const SizedBox.shrink(),
                           ),
                         );
                       },
@@ -1893,10 +1843,16 @@ class _TmdbMovieDetailsScreenState
                         final season = (data['seasons'] as List)[index];
                         final posterPath = season['poster_path'];
                         final seasonNum = season['season_number'];
-                        final isSelected = _selectedSeason == seasonNum;
+                        final isSelected =
+                            ref
+                                .watch(tmdbDetailsControllerProvider)
+                                .selectedSeason ==
+                            seasonNum;
 
                         return TvCardsWrapper(
-                          onTap: () => _fetchEpisodes(seasonNum),
+                          onTap: () => ref
+                              .read(tmdbDetailsControllerProvider.notifier)
+                              .fetchEpisodes(widget.movieId, seasonNum),
                           child: Container(
                             width: 120,
                             decoration: BoxDecoration(
@@ -1931,9 +1887,8 @@ class _TmdbMovieDetailsScreenState
                                   Container(
                                     width: double.infinity,
                                     color: isSelected
-                                        ? Theme.of(
-                                            context,
-                                          ).colorScheme.primary.withValues(alpha: 0.2)
+                                        ? Theme.of(context).colorScheme.primary
+                                              .withValues(alpha: 0.2)
                                         : Colors.transparent,
                                     padding: const EdgeInsets.all(8.0),
                                     child: Text(
@@ -1960,9 +1915,12 @@ class _TmdbMovieDetailsScreenState
                   const SizedBox(height: 24),
 
                   // Episodes List
-                  if (_episodesFuture != null)
+                  if (ref.watch(tmdbDetailsControllerProvider).episodesFuture !=
+                      null)
                     FutureBuilder<Map<String, dynamic>?>(
-                      future: _episodesFuture,
+                      future: ref
+                          .watch(tmdbDetailsControllerProvider)
+                          .episodesFuture,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
@@ -2100,7 +2058,9 @@ class _TmdbMovieDetailsScreenState
                                                         color: Theme.of(context)
                                                             .colorScheme
                                                             .onSurface
-                                                            .withValues(alpha: 0.7),
+                                                            .withValues(
+                                                              alpha: 0.7,
+                                                            ),
                                                         fontSize: 12,
                                                       ),
                                                     ),
@@ -2219,7 +2179,9 @@ class _TmdbMovieDetailsScreenState
           Text(
             label,
             style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.6),
               fontSize: 14,
             ),
           ),

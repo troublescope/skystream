@@ -74,6 +74,7 @@ class _VirtualMouseState extends State<VirtualMouse> {
 
   double _dx = 0;
   double _dy = 0;
+  Timer? _moveTimer;
 
   double _maxWidth = 0;
   double _maxHeigth = 0;
@@ -101,7 +102,8 @@ class _VirtualMouseState extends State<VirtualMouse> {
   }
 
   void _move() {
-    Timer.periodic(widget.duration, (t) {
+    if (_moveTimer?.isActive ?? false) return; // Single-flight guard
+    _moveTimer = Timer.periodic(widget.duration, (t) {
       bool shouldContinue = false;
 
       if (_keyMap.left && _dx > 0) {
@@ -133,6 +135,7 @@ class _VirtualMouseState extends State<VirtualMouse> {
 
       if (!shouldContinue) {
         t.cancel();
+        _moveTimer = null;
       }
 
       widget.onMove?.call(offset, size);
@@ -192,6 +195,7 @@ class _VirtualMouseState extends State<VirtualMouse> {
 
   @override
   void dispose() {
+    _moveTimer?.cancel();
     _keyMap.removeListener(_keyListener);
     super.dispose();
   }

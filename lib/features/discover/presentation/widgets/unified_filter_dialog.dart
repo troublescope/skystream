@@ -40,9 +40,9 @@ class _UnifiedFilterDialogState extends ConsumerState<UnifiedFilterDialog>
           width: double.infinity,
           constraints: const BoxConstraints(maxHeight: 650, maxWidth: 500),
           decoration: BoxDecoration(
-            color: Theme.of(
-              context,
-            ).scaffoldBackgroundColor.withValues(alpha: 0.9), // Glassmorphism base
+            color: Theme.of(context).scaffoldBackgroundColor.withValues(
+              alpha: 0.9,
+            ), // Glassmorphism base
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
               color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
@@ -50,7 +50,9 @@ class _UnifiedFilterDialogState extends ConsumerState<UnifiedFilterDialog>
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.2), // Shadow always black
+                color: Colors.black.withValues(
+                  alpha: 0.2,
+                ), // Shadow always black
                 blurRadius: 20,
                 offset: const Offset(0, 10),
               ),
@@ -293,14 +295,18 @@ class _RatingTab extends ConsumerWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          tileColor: isSelected ? Colors.blueAccent.withValues(alpha: 0.2) : null,
+          tileColor: isSelected
+              ? Colors.blueAccent.withValues(alpha: 0.2)
+              : null,
           focusColor: Colors.blueAccent.withValues(alpha: 0.5),
           leading: Icon(
             Icons.star,
             color: isSelected
                 ? Colors.blueAccent
                 : (rating == null
-                      ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)
+                      ? Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.3)
                       : Colors.amber),
           ),
           title: Text(
@@ -336,7 +342,7 @@ class _LanguageTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final languages = ref.watch(languageListProvider);
-    final currentLang = ref.watch(languageProvider);
+    final currentLang = ref.watch(languageProvider).asData?.value ?? 'en-US';
 
     return GridView.builder(
       padding: const EdgeInsets.all(20),
@@ -362,7 +368,9 @@ class _LanguageTab extends ConsumerWidget {
             decoration: BoxDecoration(
               color: isSelected
                   ? Colors.blueAccent.withValues(alpha: 0.2)
-                  : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                  : Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: isSelected
@@ -459,7 +467,9 @@ class _GenreTab extends ConsumerWidget {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
-              tileColor: isSelected ? Colors.blueAccent.withValues(alpha: 0.2) : null,
+              tileColor: isSelected
+                  ? Colors.blueAccent.withValues(alpha: 0.2)
+                  : null,
               leading: Icon(
                 Icons.category, // Distinct icon for All
                 color: isSelected ? Colors.blueAccent : Colors.white24,
@@ -488,13 +498,17 @@ class _GenreTab extends ConsumerWidget {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-            tileColor: isSelected ? Colors.blueAccent.withValues(alpha: 0.2) : null,
+            tileColor: isSelected
+                ? Colors.blueAccent.withValues(alpha: 0.2)
+                : null,
             focusColor: Colors.blueAccent.withValues(alpha: 0.5),
             leading: Icon(
               isSelected ? Icons.check_circle : Icons.circle_outlined,
               color: isSelected
                   ? Colors.blueAccent
-                  : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                  : Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.3),
             ),
             title: Text(
               genre['name'],
@@ -552,7 +566,9 @@ class _YearTab extends ConsumerWidget {
               decoration: BoxDecoration(
                 color: isSelected
                     ? Colors.blueAccent.withValues(alpha: 0.2)
-                    : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                    : Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                   color: isSelected ? Colors.blueAccent : Colors.transparent,
@@ -588,7 +604,9 @@ class _YearTab extends ConsumerWidget {
             decoration: BoxDecoration(
               color: isSelected
                   ? Colors.blueAccent.withValues(alpha: 0.2)
-                  : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                  : Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
                 color: isSelected ? Colors.blueAccent : Colors.transparent,

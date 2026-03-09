@@ -3,77 +3,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:skystream/core/domain/entity/multimedia_item.dart';
 import 'package:skystream/core/extensions/extension_manager.dart';
+import 'package:skystream/features/search/presentation/search_provider.dart';
 import '../details_screen.dart';
 import '../../../../shared/widgets/desktop_scroll_wrapper.dart';
 import '../../../../shared/widgets/tv_cards_wrapper.dart'; // Import TvCardsWrapper
 import '../../../../shared/widgets/shimmer_placeholder.dart';
 
-// Provider Result wrapper
-class ProviderSearchResult {
-  final String providerId;
-  final String providerName;
-  final List<MultimediaItem> results;
-  final String? error;
-
-  ProviderSearchResult({
-    required this.providerId,
-    required this.providerName,
-    required this.results,
-    this.error,
-  });
-}
-
-// Localized Search Provider (Family to allow specific queries per instance if needed)
-final providerSearchProvider = FutureProvider.family
+// Delegates to the shared searchAllProviders() function — no duplicated
+// fan-out, mapping, or filtering logic.
+final _providerSearchProvider = FutureProvider.family
     .autoDispose<List<ProviderSearchResult>, String>((ref, query) async {
-      if (query.length < 2) return [];
-
       final manager = ref.read(extensionManagerProvider.notifier);
-      final providers = manager.getAllProviders();
-
-      // Parallel execution of all provider searches
-      final futures = providers.map((provider) async {
-        try {
-          final rawResults = await provider.search(query);
-
-          // Map to MultimediaItem & inject provider ID
-          final results = rawResults.map((item) {
-            return MultimediaItem(
-              title: item.title,
-              url: item.url,
-              posterUrl: item.posterUrl,
-              bannerUrl: item.bannerUrl,
-              description: item.description,
-              isFolder: item.isFolder,
-              episodes: item.episodes,
-              provider: provider.id,
-            );
-          }).toList();
-
-          // Flexible filtering (Prefix match usually works best, but sometimes exact)
-          final filtered = results.where((item) {
-            final titleLower = item.title.toLowerCase();
-            final queryLower = query.toLowerCase();
-            // Allow partial matches
-            return titleLower.contains(queryLower);
-          }).toList();
-
-          return ProviderSearchResult(
-            providerId: provider.id,
-            providerName: provider.name,
-            results: filtered,
-          );
-        } catch (e) {
-          return ProviderSearchResult(
-            providerId: provider.id,
-            providerName: provider.name,
-            results: [],
-            error: e.toString(),
-          );
-        }
-      }).toList();
-
-      return await Future.wait(futures);
+      // Collect the final emission from the incremental stream
+      return await searchAllProviders(query, manager).last;
     });
 
 class ProviderSearchSection extends ConsumerStatefulWidget {
@@ -111,7 +53,7 @@ class _ProviderSearchSectionState extends ConsumerState<ProviderSearchSection> {
     if (widget.query.isEmpty) return const SizedBox.shrink();
 
     final plugins = ref.watch(extensionManagerProvider);
-    final searchAsync = ref.watch(providerSearchProvider(widget.query));
+    final searchAsync = ref.watch(_providerSearchProvider(widget.query));
 
     Widget content;
     if (plugins.isEmpty) {

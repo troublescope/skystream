@@ -1,25 +1,20 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
-import 'package:media_kit/media_kit.dart';
+import 'package:media_kit/media_kit.dart' hide PlayerState;
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
-import 'package:path_provider/path_provider.dart';
 
 import '../../../../core/domain/entity/multimedia_item.dart';
-import '../../../../core/extensions/base_provider.dart';
-import '../../../../core/extensions/extension_manager.dart';
-import '../../../../core/storage/storage_service.dart';
-import '../../library/presentation/history_provider.dart';
-import 'widgets/skystream_player_controls.dart';
-import '../../../../features/settings/presentation/player_settings_provider.dart';
-import '../../../../core/services/torrent_service.dart';
-import '../../../../core/models/torrent_status.dart';
 import '../../../../core/providers/device_info_provider.dart';
 import '../../../../shared/widgets/tv_input_widgets.dart';
+import '../../../../features/settings/presentation/player_settings_provider.dart';
+import 'widgets/skystream_player_controls.dart';
+import 'player_controller.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
   final MultimediaItem item;
@@ -36,27 +31,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   late final Player _player;
   late final VideoController _videoController;
 
-  final ValueNotifier<String?> _errorMessage = ValueNotifier(null);
-  // --- ValueNotifier fields for granular rebuilds ---
-  final ValueNotifier<bool> _isLoading = ValueNotifier(true);
-  late final WatchHistoryNotifier _historyNotifier;
-
-  late final ValueNotifier<String> _playerTitle;
-  final ValueNotifier<String?> _streamSubtitle = ValueNotifier(null);
-  List<StreamResult> _streams = [];
-  StreamResult? _currentStream; // Current active stream
-  StreamResult? _previousStream; // Last active stream before manual switch
-  bool _isManualSwitch = false; // Flag to track manual switching
-  List<SubtitleFile> _externalSubtitles = [];
   final ValueNotifier<BoxFit> _videoFit = ValueNotifier(BoxFit.contain);
   final ValueNotifier<bool> _controlsVisible = ValueNotifier(true);
+  final ValueNotifier<bool> _forceShowControls = ValueNotifier(false);
 
   final GlobalKey<SkyStreamPlayerControlsState> _controlsKeyFinal = GlobalKey();
 
   bool _isTv = false;
-  String? _cachedProviderId;
-  final ValueNotifier<bool> _forceShowControls = ValueNotifier(false);
-
   late final FocusNode _skipFocusNode;
 
   @override
@@ -64,51 +45,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     super.initState();
     _skipFocusNode = FocusNode(onKeyEvent: _handleSkipFocusKey);
     MediaKit.ensureInitialized();
-    //...
-    _historyNotifier = ref.read(watchHistoryProvider.notifier);
+    WidgetsBinding.instance.addObserver(this);
+
     _isTv = ref.read(deviceProfileProvider).asData?.value.isTv ?? false;
-    _cachedProviderId = ref.read(activeProviderStateProvider)?.id;
 
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     WakelockPlus.enable();
-
-    _playerTitle = ValueNotifier(widget.item.title);
-
-    // Resolve Episode Title if Series
-    if (widget.item.episodes != null && widget.item.episodes!.isNotEmpty) {
-      if (widget.item.episodes!.length > 1) {
-        try {
-          final ep = widget.item.episodes!.firstWhere(
-            (e) => e.url == widget.videoUrl,
-            orElse: () => widget.item.episodes!.first,
-          );
-
-          if (ep.url == widget.videoUrl) {
-            String epTitle = "";
-            if (ep.season > 0 && ep.episode > 0) {
-              epTitle = "S${ep.season}:E${ep.episode}";
-            } else if (ep.episode > 0) {
-              epTitle = "E${ep.episode}";
-            }
-
-            if (ep.name.isNotEmpty && ep.name != "Episode ${ep.episode}") {
-              epTitle = "$epTitle - ${ep.name}";
-            }
-
-            if (epTitle.isNotEmpty) {
-              if (epTitle.startsWith(" - ")) epTitle = epTitle.substring(3);
-              _playerTitle.value = "${widget.item.title} $epTitle";
-            }
-          }
-        } catch (_) {}
-      }
-    }
 
     // Initialize player with larger buffer for torrent streaming
     _player = Player(
       configuration: const PlayerConfiguration(
         bufferSize: 128 * 1024 * 1024, // 128MB
-        // logLevel: MPVLogLevel.info, // Enable logging for debugging
       ),
     );
 
@@ -118,93 +65,32 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     }
     _videoController = VideoController(_player);
 
-    final settings = ref.read(playerSettingsProvider);
-    if (settings.defaultResizeMode == "Zoom") {
-      _videoFit.value = BoxFit.cover;
-    } else if (settings.defaultResizeMode == "Stretch") {
-      _videoFit.value = BoxFit.fill;
-    }
-
-    _initPlayer();
-
-    // Hide loading when video is ready
-    _player.stream.videoParams.listen((args) {
-      if (args.w != null && args.w! > 0) {
-        if (mounted && _isLoading.value) {
-          _isLoading.value = false;
-        }
+    ref.listenManual<AsyncValue<PlayerSettings>>(playerSettingsProvider, (
+      _,
+      next,
+    ) {
+      final settings = next.asData?.value;
+      if (settings == null) return;
+      if (settings.defaultResizeMode == "Zoom") {
+        _videoFit.value = BoxFit.cover;
+      } else if (settings.defaultResizeMode == "Stretch") {
+        _videoFit.value = BoxFit.fill;
       }
+    }, fireImmediately: true);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref
+          .read(playerControllerProvider.notifier)
+          .init(player: _player, item: widget.item, videoUrl: widget.videoUrl);
     });
-
-    // Auto-skip on player error
-    _player.stream.error.listen((error) {
-      debugPrint("Player Error: $error");
-
-      // Ignore errors during intentional stream changes or minor interruptions
-      if (_isOpeningStream) return;
-      if (error.toString().toLowerCase().contains("abort")) return;
-
-      if (mounted && _isLoading.value) {
-        if (_isManualSwitch) {
-          _revertToPreviousStream("Stream failed. Reverting...");
-        } else {
-          _retryNextStream();
-        }
-      }
-    });
-
-    // OPTIMIZATION: Event-driven progress saving instead of Timer.periodic
-    // Saves on: pause, seek threshold, app lifecycle, stream change, dispose
-    _setupEventDrivenProgressSaving();
-  }
-
-  // Track last saved position for threshold-based saving
-  Duration _lastSavedPosition = Duration.zero;
-  static const double _saveThresholdPercent = 0.05; // Save every 5% of progress
-
-  void _setupEventDrivenProgressSaving() {
-    // 1. Save when user pauses + P11: Control torrent polling
-    _player.stream.playing.listen((isPlaying) {
-      if (!isPlaying && mounted) {
-        _saveProgress();
-        // P11: Pause torrent polling when video paused (save CPU)
-        _torrentPollTimer?.cancel();
-        _torrentPollTimer = null;
-      } else if (isPlaying &&
-          _torrentStatus != null &&
-          _torrentPollTimer == null) {
-        // P11: Resume torrent polling when playing (only if we were in torrent mode)
-        _startTorrentPolling();
-      }
-    });
-
-    // 2. Save on position threshold (every 5% of video)
-    _player.stream.position.listen((pos) {
-      if (!mounted) return;
-      final duration = _player.state.duration;
-      if (duration == Duration.zero) return;
-
-      final currentPct = pos.inMilliseconds / duration.inMilliseconds;
-      final lastPct =
-          _lastSavedPosition.inMilliseconds / duration.inMilliseconds;
-
-      if ((currentPct - lastPct).abs() >= _saveThresholdPercent) {
-        _saveProgress();
-        _lastSavedPosition = pos;
-      }
-    });
-
-    // 3. Register for app lifecycle events
-    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Save progress when app goes to background
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.hidden) {
-      _saveProgress();
+      ref.read(playerControllerProvider.notifier).saveProgress();
     }
   }
 
@@ -217,567 +103,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     return KeyEventResult.ignored;
   }
 
-  int _currentStreamIndex = 0;
-
-  TorrentStatus? _torrentStatus;
-  Timer? _torrentPollTimer;
-
-  void _startTorrentPolling([String? activeStreamUrl]) {
-    _torrentPollTimer?.cancel();
-
-    Future<void> poll() async {
-      if (!mounted) return;
-      final status = await TorrentService().getCurrentStatus();
-      if (mounted && status != null) {
-        // Try to update title if we are playing a file
-        final urlToCheck = activeStreamUrl ?? _currentStream?.url;
-        if (urlToCheck?.contains("index=") ?? false) {
-          try {
-            final uri = Uri.parse(urlToCheck!);
-            final indexStr = uri.queryParameters['index'];
-            if (indexStr != null) {
-              final index = int.tryParse(indexStr);
-              final files = status.data['file_stats'] as List<dynamic>?;
-              final file = files?.firstWhere(
-                (f) => f['id'] == index,
-                orElse: () => null,
-              );
-              if (file != null) {
-                final name = (file['path'] as String).split('/').last;
-                if (_playerTitle.value != name) {
-                  _playerTitle.value = name;
-                }
-              }
-            }
-          } catch (_) {}
-        }
-
-        // Update torrent status without setState — only controls care about it
-        _torrentStatus = status;
-        // Trigger controls rebuild if needed
-        _controlsKeyFinal.currentState?.updateTorrentStatus(status);
-      }
-    }
-
-    poll(); // Run immediately
-    _torrentPollTimer = Timer.periodic(
-      const Duration(seconds: 1),
-      (_) => poll(),
-    );
-  }
-
-  Future<void> _initPlayer() async {
-    // 1. Handle Special Providers (Local, Torrent, Remote)
-    if (await _handleSpecialProviders()) return;
-
-    // Resolve Active Provider
-    final activeProvider = _resolveProvider();
-    if (activeProvider == null) {
-      if (mounted) {
-        _errorMessage.value = "No provider selected.";
-        _isLoading.value = false;
-      }
-      return;
-    }
-
-    try {
-      if (widget.videoUrl.isNotEmpty) {
-        // Fallback: Check if URL looks like a torrent
-        if (await _handleFallbackTorrent()) return;
-
-        // Load Streams from Provider
-        final streams = await activeProvider.loadStreams(widget.videoUrl);
-        if (streams.isNotEmpty) {
-          final initialIndex = _findSavedStreamIndex(streams);
-
-          if (mounted) {
-            _streams = streams;
-            _currentStreamIndex = initialIndex;
-            _loadStreamAtIndex(initialIndex);
-          }
-          return;
-        }
-      }
-    } catch (e) {
-      debugPrint("Error loading streams: $e");
-    }
-
-    // Handle Failure
-    if (mounted) {
-      _errorMessage.value = "No streams found.";
-      _isLoading.value = false;
-    }
-  }
-
-  /// Handles Local, Torrent, and Remote providers directly.
-  /// Returns true if handled, false otherwise.
-  Future<bool> _handleSpecialProviders() async {
-    if (widget.item.provider == 'Remote' ||
-        widget.item.provider == 'Local' ||
-        widget.item.provider == 'Torrent') {
-      final isTorrent =
-          widget.item.provider == 'Torrent' ||
-          widget.videoUrl.startsWith("magnet:") ||
-          widget.videoUrl.endsWith(".torrent");
-
-      final stream = StreamResult(
-        url: widget.videoUrl,
-        quality: isTorrent ? "Torrent" : "Video",
-        headers: {},
-      );
-
-      if (mounted) {
-        _streams = [stream];
-        _currentStreamIndex = 0;
-        _loadStreamAtIndex(0);
-      }
-      return true;
-    }
-    return false;
-  }
-
-  /// Handles cases where provider is standard but URL is a torrent/magnet.
-  Future<bool> _handleFallbackTorrent() async {
-    if (widget.videoUrl.startsWith("magnet:") ||
-        widget.videoUrl.endsWith(".torrent")) {
-      // Treated as torrent
-      if (mounted) {
-        // Update state directly, _loadStreamAtIndex will trigger the UI rebuild via setState
-        _streams = [
-          StreamResult(url: widget.videoUrl, quality: "Torrent", headers: {}),
-        ];
-        _currentStreamIndex = 0;
-        _loadStreamAtIndex(0);
-      }
-      return true;
-    }
-    return false;
-  }
-
-  SkyStreamProvider? _resolveProvider() {
-    final activeState = ref.read(activeProviderStateProvider);
-    final manager = ref.read(extensionManagerProvider.notifier);
-
-    if (widget.item.provider != null) {
-      try {
-        final val = widget.item.provider!;
-        return manager.getAllProviders().firstWhere(
-          (p) => p.id == val || p.name == val,
-        );
-      } catch (_) {}
-    }
-    return activeState;
-  }
-
-  int _findSavedStreamIndex(List<StreamResult> streams) {
-    int initialIndex = 0;
-    try {
-      final storage = ref.read(storageServiceProvider);
-      final lastUrl = storage.getLastStreamUrl(widget.item.url);
-      if (lastUrl != null) {
-        final foundIndex = streams.indexWhere((s) => s.url == lastUrl);
-        if (foundIndex != -1) {
-          initialIndex = foundIndex;
-        }
-      }
-    } catch (e) {
-      debugPrint("Error checking saved stream quality: $e");
-    }
-    return initialIndex;
-  }
-
-  Future<void> _applyPlaybackProperties(Map<String, String> headers) async {
-    if (_player.platform is! NativePlayer) {
-      return;
-    }
-    final native = _player.platform as NativePlayer;
-
-    // Create a lowercase map for case-insensitive lookups
-    final lowerHeaders = headers.map((k, v) => MapEntry(k.toLowerCase(), v));
-
-    if (lowerHeaders.containsKey('user-agent')) {
-      final ua = lowerHeaders['user-agent']!;
-      await native.setProperty('user-agent', ua);
-    }
-
-    // Set Referrer (Native property)
-    if (lowerHeaders.containsKey('referer')) {
-      final ref = lowerHeaders['referer']!;
-      await native.setProperty('referrer', ref);
-    }
-
-    // Set Cookie File for stateful handling (Important for HLS segments)
-    try {
-      final tempDir = await getTemporaryDirectory();
-      final cookieFile = File('${tempDir.path}/mpv_cookies.txt');
-      // Ensure file exists (touched)
-      if (!await cookieFile.exists()) {
-        await cookieFile.create();
-      }
-      await native.setProperty('cookies-file', cookieFile.path);
-
-      // Also enable cookie-leaking to allow cross-site redirects if needed
-      await native.setProperty('cookies-file-access', 'read+write');
-    } catch (e) {
-      debugPrint("Failed to set cookies-file: $e");
-    }
-
-    // Determine Cookie (Case Insensitive Check)
-    for (final k in headers.keys) {
-      if (k.toLowerCase() == 'cookie') {
-        break;
-      }
-    }
-  }
-
-  Future<String?> _resolveStreamUrl(StreamResult stream) async {
-    // 1. Handle Data URI (Fixed M3U8 from JS)
-    // if (stream.url.startsWith("data:")) {
-    //   try {
-    //     final uri = Uri.parse(stream.url);
-    //     final content = uri.data?.contentAsBytes();
-    //     if (content != null) {
-    //       final tempDir = await getTemporaryDirectory();
-    //       final file = File(
-    //         '${tempDir.path}/playlist_${DateTime.now().millisecondsSinceEpoch}.m3u8',
-    //       );
-    //       await file.writeAsBytes(content);
-    //       // debugPrint("Resolved Data URI to file: ${file.path}");
-    //       return file.path;
-    //     }
-    //   } catch (e) {
-    //     debugPrint("Failed to resolve Data URI: $e");
-    //   }
-    // }
-    // 2. Fallback to existing logic
-    return _getPlayableUrl(stream);
-  }
-
-  Future<String?> _getPlayableUrl(StreamResult stream) async {
-    // Only use TorrentService for actual torrents or magnet links
-    // Ordinary local files (starting with /) should NOT go here unless they are .torrent
-    if (stream.url.startsWith("magnet:") ||
-        stream.url.endsWith(".torrent") ||
-        (stream.url.startsWith("/") && stream.quality.contains("Torrent"))) {
-      _streamSubtitle.value = "Initializing Torrent Engine...";
-      final torrentUrl = await TorrentService().getStreamUrl(stream.url);
-      if (torrentUrl != null) {
-        // _startTorrentPolling(torrentUrl) - moved to caller to control flow
-        return torrentUrl;
-      }
-      return null;
-    }
-    return stream.url;
-  }
-
-  Future<void> _loadStreamAtIndex(int index) async {
-    if (index < 0 || index >= _streams.length) return;
-
-    final stream = _streams[index];
-    final rawProviderName =
-        widget.item.provider ??
-        ref.read(activeProviderStateProvider)?.name ??
-        "Unknown";
-    final providerName = _getProviderDisplayName(rawProviderName);
-
-    _currentStreamIndex = index;
-    _currentStream = stream;
-    _isLoading.value = true;
-    _streamSubtitle.value = "$providerName - ${stream.quality}";
-    _externalSubtitles = stream.subtitles ?? [];
-
-    try {
-      final playUrl = await _resolveStreamUrl(stream);
-      if (playUrl == null) throw Exception("Failed to resolve stream URL");
-
-      // Start polling with the resolved URL (which has the index)
-      if (playUrl.contains("index=")) {
-        _startTorrentPolling(playUrl);
-      }
-
-      // RESTORE SUBTITLE: It might have been overwritten by "Initializing..."
-      _streamSubtitle.value = "$providerName - ${stream.quality}";
-
-      final headers = stream.headers ?? {};
-      debugPrint("OPENING PLAYER with URL: $playUrl");
-      debugPrint("FINAL HEADERS Map: $headers");
-      if (headers.containsKey('sec-ch-ua')) {
-        debugPrint("SEC-CH-UA check: ${headers['sec-ch-ua']}");
-      }
-
-      // Ensure MPV uses these headers for sub-requests (playlists segments)
-      await _applyPlaybackProperties(headers);
-
-      // Handle ClearKey DRM injection via MPV / FFmpeg properties
-      final extras = <String, String>{};
-      if (stream.drmKid != null && stream.drmKey != null) {
-        debugPrint(
-          "INJECTING CLEARKEY DRM: KID=${stream.drmKid}, KEY=${stream.drmKey}",
-        );
-        // mpv delegates DASH to ffmpeg. We pass the key as a lavf option.
-        // Format: decryption_key=KID:KEY
-        extras['demuxer-lavf-o'] =
-            'decryption_key=${stream.drmKid}:${stream.drmKey}';
-      }
-
-      await _player.open(Media(playUrl, httpHeaders: headers, extras: extras));
-
-      // Resume logic: Check if we have history for this item
-      final storage = ref.read(storageServiceProvider);
-      final savedPos = storage.getPosition(widget.item.url);
-
-      if (savedPos > 0) {
-        debugPrint("Resuming from position: $savedPos ms");
-        await _safeSeekTo(savedPos);
-      }
-    } catch (e) {
-      debugPrint("Stream $index failed: $e");
-      // Try next stream
-      _retryNextStream();
-    }
-  }
-
-  void _retryNextStream() {
-    if (_currentStreamIndex < _streams.length - 1) {
-      _loadStreamAtIndex(_currentStreamIndex + 1);
-    } else {
-      _errorMessage.value = "All streams failed.";
-      _isLoading.value = false;
-    }
-  }
-
-  bool _isReverting = false; // Prevent double reverts
-  bool _isOpeningStream = false; // Guard for transient errors during open
-
-  void _revertToPreviousStream(String reason) {
-    if (_previousStream == null || _isReverting) {
-      if (_previousStream == null) {
-        _errorMessage.value = "Stream failed. No fallback available.";
-        _isLoading.value = false;
-        _isManualSwitch = false;
-      }
-      return;
-    }
-
-    _isReverting = true;
-
-    // Calculate margins to center the toast with a fixed width of approx 300px
-    final screenWidth = MediaQuery.of(context).size.width;
-    const double toastWidth = 300.0;
-    final double horizontalMargin = (screenWidth > toastWidth)
-        ? (screenWidth - toastWidth) / 2
-        : 16.0;
-
-    ScaffoldMessenger.of(context).clearSnackBars(); // Clear existing
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          reason,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: Colors.white),
-        ),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: const Color(0xFF333333), // Neutral dark grey
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        margin: EdgeInsets.only(
-          left: horizontalMargin,
-          right: horizontalMargin,
-          bottom: 20,
-        ),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-
-    debugPrint("Reverting to previous stream: ${_previousStream?.quality}");
-    _changeStream(_previousStream!, isRevert: true);
-  }
-
-  Future<void> _changeStream(
-    StreamResult stream, {
-    bool isRevert = false,
-    bool resetPosition = false,
-  }) async {
-    if (!isRevert) {
-      _previousStream = _currentStream;
-      _isManualSwitch = true;
-    }
-
-    _isLoading.value = true;
-    _currentStream = stream;
-    _externalSubtitles = stream.subtitles ?? [];
-
-    // OPTIMISTIC UPDATE: Update subtitle immediately to reflect target stream
-    final rawPName =
-        widget.item.provider ??
-        ref.read(activeProviderStateProvider)?.name ??
-        'Unknown';
-    final pName = _getProviderDisplayName(rawPName);
-    _streamSubtitle.value = "$pName - ${stream.quality}";
-
-    final oldPos = _player.state.position;
-    _isOpeningStream = true; // Start ignoring transient errors
-
-    try {
-      final playUrl = await _resolveStreamUrl(stream);
-      if (playUrl == null) throw Exception("Failed to resolve stream URL");
-
-      // Start polling with the resolved URL
-      if (playUrl.contains("index=")) {
-        _startTorrentPolling(playUrl);
-      }
-
-      // RESTORE SUBTITLE
-      final rawPName =
-          widget.item.provider ??
-          ref.read(activeProviderStateProvider)?.name ??
-          'Unknown';
-      final pName = _getProviderDisplayName(rawPName);
-      _streamSubtitle.value = "$pName - ${stream.quality}";
-
-      final headers = stream.headers ?? {};
-
-      // Ensure MPV uses these headers for sub-requests (playlists segments)
-      await _applyPlaybackProperties(headers);
-
-      // Handle ClearKey DRM injection via MPV / FFmpeg properties
-      final extras = <String, String>{};
-      if (stream.drmKid != null && stream.drmKey != null) {
-        debugPrint(
-          "INJECTING CLEARKEY DRM: KID=${stream.drmKid}, KEY=${stream.drmKey}",
-        );
-        // mpv delegates DASH to ffmpeg. We pass the key as a lavf option.
-        // Format: decryption_key=KID:KEY
-        extras['demuxer-lavf-o'] =
-            'decryption_key=${stream.drmKid}:${stream.drmKey}';
-      }
-
-      await _player.open(Media(playUrl, httpHeaders: headers, extras: extras));
-
-      if (oldPos > Duration.zero && !resetPosition) {
-        await _safeSeekTo(oldPos.inMilliseconds);
-      } else if (resetPosition) {
-        await _player.seek(Duration.zero);
-      }
-
-      _isLoading.value = false;
-      if (isRevert) {
-        _isManualSwitch = false;
-        _isReverting = false;
-      }
-
-      if (!isRevert) _isManualSwitch = false;
-    } catch (e) {
-      debugPrint("Change stream failed: $e");
-      if (isRevert) {
-        _errorMessage.value = "Revert failed: $e";
-        _isReverting = false;
-      } else {
-        _revertToPreviousStream("Switch failed. Reverting...");
-      }
-    } finally {
-      _isOpeningStream = false; // Resume error listening
-    }
-  }
-
   void _updateResizeMode(BoxFit mode) {
     if (mounted) _videoFit.value = mode;
   }
 
-  Future<void> _onTorrentFileSelected(int index) async {
-    _isLoading.value = true;
-    try {
-      final url = await TorrentService().getStreamUrlForFileIndex(index);
-      if (url != null && _currentStream != null && mounted) {
-        String fileLabel = "Torrent File $index";
-        try {
-          final files = _torrentStatus?.data['file_stats'] as List<dynamic>?;
-          final file = files?.firstWhere(
-            (f) => f['id'] == index,
-            orElse: () => null,
-          );
-          if (file != null) {
-            fileLabel = (file['path'] as String).split('/').last;
-            _playerTitle.value = fileLabel;
-          }
-        } catch (_) {}
-
-        final newStream = StreamResult(
-          url: url,
-          quality: "Torrent ($fileLabel)",
-          headers: {},
-        );
-        _changeStream(newStream, resetPosition: true);
-      } else {
-        if (mounted) _isLoading.value = false;
-      }
-    } catch (e) {
-      debugPrint("Failed to switch file: $e");
-      if (mounted) _isLoading.value = false;
-    }
-  }
-
-  void _saveProgress() {
-    try {
-      final pos = _player.state.position.inMilliseconds;
-      final dur = _player.state.duration.inMilliseconds;
-
-      // Android Logic:
-      // Minimum Duration: Must be at least 30 seconds
-      if (dur < 30000) {
-        return;
-      }
-
-      // Calculate percentage
-      final double progress = (pos / dur) * 100;
-
-      // Mark as Watched logic
-      final bool isSeries =
-          widget.item.episodes != null && widget.item.episodes!.length > 1;
-
-      // Only remove from history if it's a Movie (or single episode) and finished
-      if (progress >= 95 && !isSeries) {
-        _historyNotifier.removeFromHistory(widget.item.url);
-        return;
-      }
-
-      // Save Progress if > 1% or if it's a Series (to track last episode even if just started)
-      if (progress > 1 || isSeries) {
-        final pId =
-            widget.item.provider ??
-            _cachedProviderId ?? // Use Cached ID
-            'Unknown';
-        final itemToSave = widget.item.copyWith(provider: pId);
-        _historyNotifier.saveProgress(
-          itemToSave,
-          pos,
-          dur,
-          lastStreamUrl: _currentStream?.url,
-          lastEpisodeUrl: widget.videoUrl, // Save the Episode URL
-        );
-      }
-    } catch (e) {
-      debugPrint("History save failed: $e");
-    }
-  }
-
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this); // Remove lifecycle observer
-    _torrentPollTimer?.cancel();
-    _saveProgress(); // Final save on exit
+    WidgetsBinding.instance.removeObserver(this);
+    ref.read(playerControllerProvider.notifier).disposeController();
 
-    // Stop torrent server/streaming to release resources
-    TorrentService().stop();
-
-    _player.dispose(); // Ensure audio stops
+    _player.dispose();
     _skipFocusNode.dispose();
-    _isLoading.dispose();
     _controlsVisible.dispose();
     _forceShowControls.dispose();
-    _playerTitle.dispose();
-    _streamSubtitle.dispose();
     _videoFit.dispose();
-    _errorMessage.dispose();
+
     WakelockPlus.disable();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
@@ -800,39 +140,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     super.dispose();
   }
 
-  void _togglePlay() {
-    _player.playOrPause();
-  }
-
-  Future<void> _safeSeekTo(int position) async {
-    if (position <= 0) return;
-
-    // Wait for player to know the duration
-    try {
-      await _player.stream.duration
-          .firstWhere((d) => d != Duration.zero)
-          .timeout(const Duration(seconds: 10));
-
-      if (_player.state.duration.inMilliseconds > position) {
-        await _player.seek(Duration(milliseconds: position));
-      } else {
-        debugPrint(
-          "Saved position ($position) > Duration (${_player.state.duration.inMilliseconds}), ignoring.",
-        );
-      }
-    } catch (e) {
-      debugPrint("Timeout waiting for duration or seek failed: $e");
-    }
-  }
-
   KeyEventResult _handleKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
-    final isTv = ref.read(deviceProfileProvider).asData?.value.isTv ?? false;
-
     // TV Navigation Logic
-    if (isTv) {
-      // If controls are visible, let the focus system handle navigation and selection
+    if (_isTv) {
       if (_controlsVisible.value) {
         if (event.logicalKey == LogicalKeyboardKey.arrowUp ||
             event.logicalKey == LogicalKeyboardKey.arrowDown ||
@@ -843,13 +155,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
           return KeyEventResult.ignored;
         }
       } else {
-        // If controls hidden:
-        // Up/Down: Show controls
         if (event.logicalKey == LogicalKeyboardKey.arrowUp ||
             event.logicalKey == LogicalKeyboardKey.arrowDown) {
           _controlsVisible.value = true;
           _forceShowControls.value = true;
-          // Reset force flag after a moment
           Future.delayed(
             const Duration(milliseconds: 200),
             () => _forceShowControls.value = false,
@@ -864,7 +173,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
         event.logicalKey == LogicalKeyboardKey.select ||
         event.logicalKey == LogicalKeyboardKey.enter ||
         event.logicalKey == LogicalKeyboardKey.mediaPlayPause) {
-      _togglePlay();
+      _player.playOrPause();
       if (!_controlsVisible.value) {
         _forceShowControls.value = true;
         Future.delayed(
@@ -875,26 +184,22 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       return KeyEventResult.handled;
     }
 
-    // Toggle Mute
     if (event.logicalKey == LogicalKeyboardKey.keyM) {
       _controlsKeyFinal.currentState?.toggleMute();
       return KeyEventResult.handled;
     }
 
-    // Cycle resize modes
     if (event.logicalKey == LogicalKeyboardKey.keyZ) {
       _controlsKeyFinal.currentState?.cycleResize();
       return KeyEventResult.handled;
     }
 
-    // Toggle Fullscreen
     if (event.logicalKey == LogicalKeyboardKey.keyF) {
       _controlsKeyFinal.currentState?.toggleFullscreen();
       return KeyEventResult.handled;
     }
 
-    // Volume control (Disable on TV)
-    if (!isTv) {
+    if (!_isTv) {
       if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
         _controlsKeyFinal.currentState?.changeVolume(0.05);
         return KeyEventResult.handled;
@@ -905,7 +210,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       }
     }
 
-    // Seek with arrow keys
     if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
       _controlsKeyFinal.currentState?.triggerSeek(true);
       return KeyEventResult.handled;
@@ -916,185 +220,171 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       return KeyEventResult.handled;
     }
 
-    // Hide controls on Escape
     if (_controlsVisible.value &&
         event.logicalKey == LogicalKeyboardKey.escape) {
       return KeyEventResult.ignored;
     }
 
-    // Pass through other keys
     return KeyEventResult.ignored;
   }
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<String?>(
-      valueListenable: _errorMessage,
-      builder: (context, errorMsg, _) {
-        if (errorMsg != null) {
-          return Scaffold(
-            body: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.error, color: Colors.red, size: 48),
-                  const SizedBox(height: 16),
-                  Text(
-                    errorMsg,
-                    style: Theme.of(context).textTheme.bodyLarge,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text("Go Back"),
-                  ),
-                ],
+    final playerState = ref.watch(playerControllerProvider);
+
+    if (playerState.errorMessage != null) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error, color: Colors.red, size: 48),
+              const SizedBox(height: 16),
+              Text(
+                playerState.errorMessage!,
+                style: Theme.of(context).textTheme.bodyLarge,
+                textAlign: TextAlign.center,
               ),
-            ),
-          );
-        }
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Go Back"),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
-        return ValueListenableBuilder<bool>(
-          valueListenable: _controlsVisible,
-          builder: (context, controlsVisible, _) {
-            return PopScope(
-              canPop: !controlsVisible,
-              onPopInvokedWithResult: (didPop, result) async {
-                if (didPop) return;
-                if (controlsVisible) {
-                  _controlsKeyFinal.currentState?.hideControls();
+    return ValueListenableBuilder<bool>(
+      valueListenable: _controlsVisible,
+      builder: (context, controlsVisible, _) {
+        return PopScope(
+          canPop: !controlsVisible,
+          onPopInvokedWithResult: (didPop, result) async {
+            if (didPop) return;
+            if (controlsVisible) {
+              _controlsKeyFinal.currentState?.hideControls();
+            }
+          },
+          child: Scaffold(
+            body: MouseRegion(
+              onHover: (_) {
+                if (!_controlsVisible.value) {
+                  _controlsVisible.value = true;
                 }
+                _controlsKeyFinal.currentState?.onUserInteraction();
               },
-              child: Scaffold(
-                body: MouseRegion(
-                  onHover: (_) {
-                    if (!_controlsVisible.value) {
-                      _controlsVisible.value = true;
-                    }
-                    _controlsKeyFinal.currentState?.onUserInteraction();
-                  },
-                  child: Focus(
-                    autofocus: false,
-                    onKeyEvent: _handleKey,
-                    child: Stack(
-                      children: [
-                        // Video widget — only rebuilds when _videoFit changes
-                        RepaintBoundary(
-                          child: ValueListenableBuilder<BoxFit>(
-                            valueListenable: _videoFit,
-                            builder: (_, fit, child) => Center(
-                              child: Video(
-                                controller: _videoController,
-                                fit: fit,
-                                subtitleViewConfiguration:
-                                    const SubtitleViewConfiguration(
-                                      visible: false,
-                                    ),
-                                controls: (state) => const SizedBox.shrink(),
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        // Custom Subtitles Position — moves with controls visibility
-                        Positioned(
-                          bottom: controlsVisible ? 120 : 20,
-                          left: 20,
-                          right: 20,
-                          child: SubtitleView(
+              child: Focus(
+                autofocus: false,
+                onKeyEvent: _handleKey,
+                child: Stack(
+                  children: [
+                    RepaintBoundary(
+                      child: ValueListenableBuilder<BoxFit>(
+                        valueListenable: _videoFit,
+                        builder: (_, fit, child) => Center(
+                          child: Video(
                             controller: _videoController,
-                            configuration: SubtitleViewConfiguration(
-                              style: TextStyle(
-                                fontSize: ref
+                            fit: fit,
+                            subtitleViewConfiguration:
+                                const SubtitleViewConfiguration(visible: false),
+                            controls: (state) => const SizedBox.shrink(),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: controlsVisible ? 120 : 20,
+                      left: 20,
+                      right: 20,
+                      child: SubtitleView(
+                        controller: _videoController,
+                        configuration: SubtitleViewConfiguration(
+                          style: TextStyle(
+                            fontSize:
+                                ref
                                     .watch(playerSettingsProvider)
-                                    .subtitleSize,
-                                color: Color(
-                                  ref
+                                    .asData
+                                    ?.value
+                                    .subtitleSize ??
+                                22.0,
+                            color: Color(
+                              ref
                                       .watch(playerSettingsProvider)
-                                      .subtitleColor,
-                                ),
-                                backgroundColor: Color(
-                                  ref
-                                      .watch(playerSettingsProvider)
-                                      .subtitleBackgroundColor,
-                                ),
-                                shadows: const [
-                                  Shadow(
-                                    offset: Offset(0, 1),
-                                    blurRadius: 2,
-                                    color: Colors.black,
-                                  ),
-                                ],
-                              ),
-                              padding: EdgeInsets.zero,
+                                      .asData
+                                      ?.value
+                                      .subtitleColor ??
+                                  0xFFFFFFFF,
                             ),
+                            backgroundColor: Color(
+                              ref
+                                      .watch(playerSettingsProvider)
+                                      .asData
+                                      ?.value
+                                      .subtitleBackgroundColor ??
+                                  0x00000000,
+                            ),
+                            shadows: const [
+                              Shadow(
+                                offset: Offset(0, 1),
+                                blurRadius: 2,
+                                color: Colors.black,
+                              ),
+                            ],
                           ),
+                          padding: EdgeInsets.zero,
                         ),
-
-                        // Custom Controls Overlay
-                        RepaintBoundary(
-                          child: SkyStreamPlayerControls(
-                            key: _controlsKeyFinal,
-                            isLoading: _isLoading.value,
-                            forceShowControls: _forceShowControls.value,
-                            player: _player,
-                            title: _playerTitle.value,
-                            subtitle: _streamSubtitle.value,
-                            streams: _streams,
-                            currentStream: _currentStream,
-                            externalSubtitles: _externalSubtitles,
-                            torrentStatus: _torrentStatus,
-                            onStreamSelected: _changeStream,
-                            onTorrentFileSelected: _onTorrentFileSelected,
-                            onResize: _updateResizeMode,
-                            onVisibilityChanged: (v) {
-                              if (mounted) _controlsVisible.value = v;
-                            },
-                          ),
-                        ),
-
-                        // Loading overlay
-                        ValueListenableBuilder<bool>(
-                          valueListenable: _isLoading,
-                          builder: (_, loading, child) {
-                            if (!loading) return const SizedBox.shrink();
-                            return ValueListenableBuilder<bool>(
-                              valueListenable: _forceShowControls,
-                              builder: (_, forceShow, child) {
-                                if (forceShow) return const SizedBox.shrink();
-                                return _buildSkipButtonOverlay();
-                              },
-                            );
+                      ),
+                    ),
+                    RepaintBoundary(
+                      child: ValueListenableBuilder<bool>(
+                        valueListenable: _forceShowControls,
+                        builder: (_, forceShow, _) => SkyStreamPlayerControls(
+                          key: _controlsKeyFinal,
+                          isLoading: playerState.isLoading,
+                          forceShowControls: forceShow,
+                          player: _player,
+                          title: playerState.playerTitle,
+                          subtitle: playerState.streamSubtitle,
+                          streams: playerState.streams,
+                          currentStream: playerState.currentStream,
+                          externalSubtitles: playerState.externalSubtitles,
+                          torrentStatus: playerState.torrentStatus,
+                          onStreamSelected: ref
+                              .read(playerControllerProvider.notifier)
+                              .changeStream,
+                          onTorrentFileSelected: ref
+                              .read(playerControllerProvider.notifier)
+                              .onTorrentFileSelected,
+                          onResize: _updateResizeMode,
+                          onVisibilityChanged: (v) {
+                            if (mounted) {
+                              _controlsVisible.value = v;
+                            }
                           },
                         ),
-                      ],
+                      ),
                     ),
-                  ),
+                    if (playerState.isLoading)
+                      ValueListenableBuilder<bool>(
+                        valueListenable: _forceShowControls,
+                        builder: (_, forceShow, child) {
+                          if (forceShow) return const SizedBox.shrink();
+                          return _buildSkipButtonOverlay(playerState);
+                        },
+                      ),
+                  ],
                 ),
               ),
-            );
-          },
+            ),
+          ),
         );
       },
     );
   }
 
-  String _getProviderDisplayName(String providerName) {
-    try {
-      final manager = ref.read(extensionManagerProvider.notifier);
-      final p = manager.getAllProviders().firstWhere(
-        (p) => p.id == providerName || p.name == providerName,
-      );
-
-      final isDebug = p.isDebug;
-      if (isDebug) return "${p.name} [DEBUG]";
-      return p.name;
-    } catch (_) {}
-    return providerName;
-  }
-
-  Widget _buildSkipButtonOverlay() {
+  Widget _buildSkipButtonOverlay(PlayerState playerState) {
     return Positioned.fill(
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
@@ -1110,14 +400,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
               left: 0,
               right: 0,
               child: Center(
-                child: _isManualSwitch
+                child: playerState.isManualSwitch
                     ? const SizedBox.shrink()
                     : TvButton(
                         isPrimary: false,
                         backgroundColor: Colors.grey.withValues(alpha: 0.3),
                         focusNode: _skipFocusNode,
                         autofocus: true,
-                        showFocusHighlight: _isTv, // Only highlight on TV
+                        showFocusHighlight: _isTv,
                         onPressed: () => _forceShowControls.value = true,
                         child: Padding(
                           padding: const EdgeInsets.all(8.0),
@@ -1127,7 +417,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                               const Icon(Icons.skip_next),
                               const SizedBox(width: 8),
                               Text(
-                                "Skip Loading (${_currentStreamIndex + 1}/${_streams.length})",
+                                "Skip Loading (${playerState.currentStreamIndex + 1}/${playerState.streams.length})",
                               ),
                             ],
                           ),

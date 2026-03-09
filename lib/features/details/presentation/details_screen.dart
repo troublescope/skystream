@@ -1,6 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/domain/entity/multimedia_item.dart';
 
@@ -12,8 +11,8 @@ import '../../../../core/providers/device_info_provider.dart';
 import '../../../core/storage/storage_service.dart';
 import '../../library/presentation/history_provider.dart';
 import '../../../../shared/widgets/tv_input_widgets.dart';
-import '../../../core/services/external_player_service.dart';
-import '../../settings/presentation/player_settings_provider.dart';
+
+import 'playback_launcher.dart';
 
 class DetailsScreen extends ConsumerStatefulWidget {
   final MultimediaItem item;
@@ -138,199 +137,12 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
     }
   }
 
-  void _play(BuildContext context, String url, [MultimediaItem? detailedItem]) {
-    final settings = ref.read(playerSettingsProvider);
-
-    if (settings.preferredPlayer != null) {
-      _launchExternal(
-        context,
-        url,
-        detailedItem ?? widget.item,
-        settings.preferredPlayer!,
-      );
-    } else {
-      context.push(
-        '/player',
-        extra: {'item': detailedItem ?? widget.item, 'url': url},
-      );
-    }
-  }
-
-  /// Resolves streams from the episode data URL, then launches in the chosen external player.
-  Future<void> _launchExternal(
-    BuildContext context,
-    String episodeDataUrl,
-    MultimediaItem item,
-    String playerId,
-  ) async {
-    // Show loading indicator
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Row(
-          children: [
-            SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-            SizedBox(width: 12),
-            Text('Resolving streams...'),
-          ],
-        ),
-        duration: Duration(seconds: 10),
-      ),
-    );
-
-    try {
-      // Get the active provider to resolve streams
-      final provider = ref.read(activeProviderStateProvider);
-      if (provider == null) throw Exception('No active provider');
-
-      final streams = await provider.loadStreams(episodeDataUrl);
-      if (!context.mounted) return;
-
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-
-      if (streams.isEmpty) {
-        final playerName =
-            ExternalPlayerService.instance
-                .getPlayerById(playerId)
-                ?.displayName ??
-            playerId;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Could not resolve video for $playerName. Starting internal player.',
-            ),
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-        context.push('/player', extra: {'item': item, 'url': episodeDataUrl});
-        return;
-      }
-
-      // Single source: launch directly. Multiple: let user pick.
-      if (streams.length == 1) {
-        _launchStream(context, streams.first, item, episodeDataUrl, playerId);
-      } else {
-        // Show source picker
-        _showSourcePicker(context, streams, item, episodeDataUrl, playerId);
-      }
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e. Using internal player.')),
-      );
-      context.push('/player', extra: {'item': item, 'url': episodeDataUrl});
-    }
-  }
-
-  /// Launch a single resolved stream in the external player, with fallback.
-  Future<void> _launchStream(
-    BuildContext context,
-    StreamResult stream,
-    MultimediaItem item,
-    String episodeDataUrl,
-    String playerId,
-  ) async {
-    final success = await ExternalPlayerService.instance.launch(
-      stream.url,
-      headers: stream.headers,
-      playerId: playerId,
-      title: item.title,
-    );
-
-    if (!success && context.mounted) {
-      final playerName =
-          ExternalPlayerService.instance.getPlayerById(playerId)?.displayName ??
-          playerId;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$playerName not detected. Starting internal player.'),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 3),
-        ),
-      );
-      context.push('/player', extra: {'item': item, 'url': episodeDataUrl});
-    }
-  }
-
-  /// Shows a bottom sheet with all available sources so the user can pick one.
-  void _showSourcePicker(
-    BuildContext context,
-    List<StreamResult> streams,
-    MultimediaItem item,
-    String episodeDataUrl,
-    String playerId,
-  ) {
-    final playerName =
-        ExternalPlayerService.instance.getPlayerById(playerId)?.displayName ??
-        playerId;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => SafeArea(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.5,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  'Choose source for $playerName',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              const Divider(height: 1),
-              Flexible(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: streams.length,
-                  itemBuilder: (context, index) {
-                    final stream = streams[index];
-                    final label = stream.quality != 'Auto'
-                        ? stream.quality
-                        : 'Source ${index + 1}';
-                    final host = Uri.tryParse(stream.url)?.host ?? '';
-
-                    return ListTile(
-                      leading: const Icon(Icons.play_circle_outline),
-                      title: Text(label),
-                      subtitle: host.isNotEmpty ? Text(host) : null,
-                      onTap: () {
-                        Navigator.pop(ctx);
-                        _launchStream(
-                          context,
-                          stream,
-                          item,
-                          episodeDataUrl,
-                          playerId,
-                        );
-                      },
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   void _handlePlayPress(BuildContext context, MultimediaItem details) {
     // Play the single episode for movies
     if (_isMovie) {
-      _play(context, details.episodes!.first.url, details);
+      ref
+          .read(playbackLauncherProvider)
+          .play(context, details.episodes!.first.url, baseItem: details);
       return;
     }
 
@@ -367,12 +179,20 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
         // If > 95% finished, try next episode
         if (progress > 95) {
           if (lastIndex + 1 < allEpisodes.length) {
-            _play(context, allEpisodes[lastIndex + 1].url, details);
+            ref
+                .read(playbackLauncherProvider)
+                .play(
+                  context,
+                  allEpisodes[lastIndex + 1].url,
+                  baseItem: details,
+                );
             return;
           }
         }
         // Else (or if no next episode), resume current
-        _play(context, lastEpisodeUrl, details);
+        ref
+            .read(playbackLauncherProvider)
+            .play(context, lastEpisodeUrl, baseItem: details);
         return;
       }
     }
@@ -381,7 +201,11 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
     final firstSeason = _seasonMap.keys.toList()..sort();
     if (firstSeason.isNotEmpty) {
       final ep = _seasonMap[firstSeason.first]?.first;
-      if (ep != null) _play(context, ep.url, details);
+      if (ep != null) {
+        ref
+            .read(playbackLauncherProvider)
+            .play(context, ep.url, baseItem: details);
+      }
     }
   }
 
@@ -828,7 +652,9 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
             return Card(
               margin: EdgeInsets.zero,
               child: InkWell(
-                onTap: () => _play(context, ep.url, parentItem),
+                onTap: () => ref
+                    .read(playbackLauncherProvider)
+                    .play(context, ep.url, baseItem: parentItem),
                 borderRadius: BorderRadius.circular(12),
                 child: Padding(
                   padding: const EdgeInsets.all(8.0),
@@ -931,7 +757,9 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
                 ),
                 subtitle: Text(ep.description ?? ""),
                 trailing: const Icon(Icons.play_circle_outline),
-                onTap: () => _play(context, ep.url, parentItem),
+                onTap: () => ref
+                    .read(playbackLauncherProvider)
+                    .play(context, ep.url, baseItem: parentItem),
               ),
             );
           },

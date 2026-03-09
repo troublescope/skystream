@@ -203,7 +203,7 @@ class JsEngineService {
           : null;
       final dynamic body = req['body'];
 
-      // print("[JS HTTP] $method $url ($requestId)");
+      print("[JS HTTP] $method $url ($requestId)");
 
       final response = await _dio.request(
         url,
@@ -216,7 +216,7 @@ class JsEngineService {
         ),
       );
 
-      // print("[JS HTTP] Back $url ($requestId) -> ${response.statusCode}");
+      print("[JS HTTP] Back $url ($requestId) -> ${response.statusCode}");
 
       // --- Cloudflare Bypass ---
       final responseHeaders = response.headers.map.map(
@@ -293,7 +293,7 @@ class JsEngineService {
         return _storage.getExtensionData(key);
       }
     } catch (e) {
-      if (kDebugMode) debugPrint("Storage Error: $e");
+      if (kDebugMode) debugPrint("JS eval error: $e");
       return null;
     }
   }

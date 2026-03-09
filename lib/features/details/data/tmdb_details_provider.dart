@@ -1,0 +1,48 @@
+import 'dart:async';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../discover/data/tmdb_provider.dart';
+import '../../discover/data/language_provider.dart';
+
+class MovieDetailsParams {
+  final int id;
+  final String type; // 'movie' or 'tv'
+  MovieDetailsParams(this.id, this.type);
+
+  @override
+  bool operator ==(Object other) =>
+      other is MovieDetailsParams && other.id == id && other.type == type;
+
+  @override
+  int get hashCode => Object.hash(id, type);
+}
+
+final movieDetailsProvider =
+    FutureProvider.family<Map<String, dynamic>?, MovieDetailsParams>((
+      ref,
+      params,
+    ) async {
+      final service = ref.watch(tmdbServiceProvider);
+      final language = await ref.watch(languageProvider.future);
+
+      // Wrap in timeout to prevent infinite loading when connection is stale
+      // This ensures error UI is shown instead of forever-loading spinner
+      try {
+        if (params.type == 'tv') {
+          return await service
+              .getTvDetails(params.id, language: language)
+              .timeout(
+                const Duration(seconds: 15),
+                onTimeout: () => throw TimeoutException('Request timed out'),
+              );
+        } else {
+          return await service
+              .getMovieDetails(params.id, language: language)
+              .timeout(
+                const Duration(seconds: 15),
+                onTimeout: () => throw TimeoutException('Request timed out'),
+              );
+        }
+      } on TimeoutException {
+        rethrow; // Let error handler show retry UI
+      }
+    });

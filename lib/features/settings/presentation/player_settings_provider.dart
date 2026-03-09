@@ -60,14 +60,9 @@ class PlayerSettings {
   }
 }
 
-class PlayerSettingsNotifier extends Notifier<PlayerSettings> {
+class PlayerSettingsNotifier extends AsyncNotifier<PlayerSettings> {
   @override
-  PlayerSettings build() {
-    _load();
-    return const PlayerSettings();
-  }
-
-  Future<void> _load() async {
+  Future<PlayerSettings> build() async {
     final prefs = await SharedPreferences.getInstance();
     final l = prefs.getString('player_gesture_left') ?? 'brightness';
     final r = prefs.getString('player_gesture_right') ?? 'volume';
@@ -77,10 +72,9 @@ class PlayerSettingsNotifier extends Notifier<PlayerSettings> {
     final subSize = prefs.getDouble('player_sub_size') ?? 22.0;
     final subColor = prefs.getInt('player_sub_color') ?? 0xFFFFFFFF;
     final subBg = prefs.getInt('player_sub_bg') ?? 0x00000000;
-
     final prefPlayer = prefs.getString('player_preferred');
 
-    state = PlayerSettings(
+    return PlayerSettings(
       leftGesture: _parse(l),
       rightGesture: _parse(r),
       doubleTapEnabled: dt,
@@ -97,37 +91,43 @@ class PlayerSettingsNotifier extends Notifier<PlayerSettings> {
   Future<void> setLeftGesture(PlayerGesture g) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('player_gesture_left', g.name);
-    state = state.copyWith(leftGesture: g);
+    final current = state.asData?.value ?? const PlayerSettings();
+    state = AsyncData(current.copyWith(leftGesture: g));
   }
 
   Future<void> setRightGesture(PlayerGesture g) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('player_gesture_right', g.name);
-    state = state.copyWith(rightGesture: g);
+    final current = state.asData?.value ?? const PlayerSettings();
+    state = AsyncData(current.copyWith(rightGesture: g));
   }
 
   Future<void> setDoubleTapEnabled(bool val) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('player_double_tap', val);
-    state = state.copyWith(doubleTapEnabled: val);
+    final current = state.asData?.value ?? const PlayerSettings();
+    state = AsyncData(current.copyWith(doubleTapEnabled: val));
   }
 
   Future<void> setSwipeSeekEnabled(bool val) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('player_swipe_seek', val);
-    state = state.copyWith(swipeSeekEnabled: val);
+    final current = state.asData?.value ?? const PlayerSettings();
+    state = AsyncData(current.copyWith(swipeSeekEnabled: val));
   }
 
   Future<void> setSeekDuration(int seconds) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('player_seek_duration', seconds);
-    state = state.copyWith(seekDuration: seconds);
+    final current = state.asData?.value ?? const PlayerSettings();
+    state = AsyncData(current.copyWith(seekDuration: seconds));
   }
 
   Future<void> setDefaultResizeMode(String mode) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('player_default_resize', mode);
-    state = state.copyWith(defaultResizeMode: mode);
+    final current = state.asData?.value ?? const PlayerSettings();
+    state = AsyncData(current.copyWith(defaultResizeMode: mode));
   }
 
   Future<void> setSubtitleSettings(double size, int color, int bg) async {
@@ -135,10 +135,13 @@ class PlayerSettingsNotifier extends Notifier<PlayerSettings> {
     await prefs.setDouble('player_sub_size', size);
     await prefs.setInt('player_sub_color', color);
     await prefs.setInt('player_sub_bg', bg);
-    state = state.copyWith(
-      subtitleSize: size,
-      subtitleColor: color,
-      subtitleBackgroundColor: bg,
+    final current = state.asData?.value ?? const PlayerSettings();
+    state = AsyncData(
+      current.copyWith(
+        subtitleSize: size,
+        subtitleColor: color,
+        subtitleBackgroundColor: bg,
+      ),
     );
   }
 
@@ -147,10 +150,12 @@ class PlayerSettingsNotifier extends Notifier<PlayerSettings> {
     final prefs = await SharedPreferences.getInstance();
     if (playerId == null) {
       await prefs.remove('player_preferred');
-      state = state.copyWith(clearPreferredPlayer: true);
+      final current = state.asData?.value ?? const PlayerSettings();
+      state = AsyncData(current.copyWith(clearPreferredPlayer: true));
     } else {
       await prefs.setString('player_preferred', playerId);
-      state = state.copyWith(preferredPlayer: playerId);
+      final current = state.asData?.value ?? const PlayerSettings();
+      state = AsyncData(current.copyWith(preferredPlayer: playerId));
     }
   }
 
@@ -163,6 +168,6 @@ class PlayerSettingsNotifier extends Notifier<PlayerSettings> {
 }
 
 final playerSettingsProvider =
-    NotifierProvider<PlayerSettingsNotifier, PlayerSettings>(
+    AsyncNotifierProvider<PlayerSettingsNotifier, PlayerSettings>(
       PlayerSettingsNotifier.new,
     );

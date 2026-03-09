@@ -6,6 +6,8 @@ import '../../details/presentation/tmdb_movie_details_screen.dart';
 import '../../../../shared/widgets/tv_cards_wrapper.dart';
 import '../../../../shared/widgets/shimmer_placeholder.dart';
 import '../data/tmdb_provider.dart';
+import '../data/language_provider.dart';
+import '../data/filter_provider.dart';
 
 enum ViewAllCategory {
   popularMovies,
@@ -80,33 +82,83 @@ class _ViewAllScreenState extends ConsumerState<ViewAllScreen> {
 
     try {
       final tmdbService = ref.read(tmdbServiceProvider);
+      final lang = await ref.read(languageProvider.future);
+      final filters = ref.read(discoverFilterProvider);
       final nextPage = _currentPage + 1;
       List<Map<String, dynamic>> newItems = [];
 
       switch (widget.category) {
         case ViewAllCategory.popularMovies:
-          newItems = await tmdbService.getPopularMovies(page: nextPage);
+          newItems = await tmdbService.getPopularMovies(
+            language: lang,
+            genreId: filters.selectedGenre?['id'],
+            year: filters.selectedYear,
+            minRating: filters.minRating,
+            page: nextPage,
+          );
           break;
         case ViewAllCategory.popularTV:
-          newItems = await tmdbService.getPopularTV(page: nextPage);
+          newItems = await tmdbService.getPopularTV(
+            language: lang,
+            genreId: filters.selectedGenre?['id'],
+            year: filters.selectedYear,
+            minRating: filters.minRating,
+            page: nextPage,
+          );
           break;
         case ViewAllCategory.nowPlayingMovies:
-          newItems = await tmdbService.getNowPlayingMovies(page: nextPage);
+          newItems = await tmdbService.getNowPlayingMovies(
+            language: lang,
+            genreId: filters.selectedGenre?['id'],
+            year: filters.selectedYear,
+            minRating: filters.minRating,
+            page: nextPage,
+          );
           break;
         case ViewAllCategory.onTheAirTV:
-          newItems = await tmdbService.getOnTheAirTV(page: nextPage);
+          newItems = await tmdbService.getOnTheAirTV(
+            language: lang,
+            genreId: filters.selectedGenre?['id'],
+            year: filters.selectedYear,
+            minRating: filters.minRating,
+            page: nextPage,
+          );
           break;
         case ViewAllCategory.topRatedMovies:
-          newItems = await tmdbService.getTopRated(page: nextPage);
+          newItems = await tmdbService.getTopRated(
+            language: lang,
+            genreId: filters.selectedGenre?['id'],
+            year: filters.selectedYear,
+            minRating: filters.minRating,
+            page: nextPage,
+          );
           break;
         case ViewAllCategory.topRatedTV:
-          newItems = await tmdbService.getTopRatedTV(page: nextPage);
+          newItems = await tmdbService.getTopRatedTV(
+            language: lang,
+            genreId: filters.selectedGenre?['id'],
+            year: filters.selectedYear,
+            minRating: filters.minRating,
+            page: nextPage,
+          );
           break;
         case ViewAllCategory.airingTodayTV:
-          newItems = await tmdbService.getAiringTodayTV(page: nextPage);
+          newItems = await tmdbService.getAiringTodayTV(
+            language: lang,
+            genreId: filters.selectedGenre?['id'],
+            year: filters.selectedYear,
+            minRating: filters.minRating,
+            page: nextPage,
+          );
           break;
         case ViewAllCategory.trending:
-          newItems = await tmdbService.getTrending(page: nextPage);
+          newItems = await tmdbService.getTrending(
+            language: lang,
+            genreId: filters.selectedGenre?['id'],
+            year: filters.selectedYear,
+            minRating: filters.minRating,
+            page: nextPage,
+          );
           break;
       }
 

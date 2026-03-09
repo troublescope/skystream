@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
-import 'package:window_manager/window_manager.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_volume_controller/flutter_volume_controller.dart';
@@ -16,6 +15,8 @@ import '../../../../core/providers/device_info_provider.dart';
 import '../../../../shared/widgets/tv_input_widgets.dart';
 import 'player_stream_widgets.dart';
 import 'player_control_components.dart';
+import '../player_platform_service.dart';
+import '../player_gesture_handler.dart';
 
 class SkyStreamPlayerControls extends ConsumerStatefulWidget {
   final Player player;
@@ -158,8 +159,6 @@ class SkyStreamPlayerControlsState
   bool _showTorrentInfo = false; // Changed from true
   Timer? _hideTimer;
   bool _isLocked = false;
-  Duration? _swipeSeekValue; // Horizontal drag value
-  double _boostLevel = 1.0;
 
   // Seek animation state
   late AnimationController _seekAnimController;
@@ -184,17 +183,9 @@ class SkyStreamPlayerControlsState
     return _isoLanguages[normalized] ?? code;
   }
 
-  // Gesture State
-  PlayerGesture? _currentGesture;
-  Alignment _osdAlignment = Alignment.center;
+  late final PlayerPlatformService _platformService;
+  late final PlayerGestureHandler _gestureHandler;
   Offset? _tapPosition;
-
-  // OSD State
-  bool _showOSD = false;
-  IconData _osdIcon = Icons.settings;
-  double? _osdValue = 0.0;
-  String _osdLabel = "";
-  Timer? _osdTimer;
   Duration _animDuration = const Duration(milliseconds: 300);
   bool _isFullscreen = false;
   late final FocusNode _playFocusNode;
@@ -203,6 +194,45 @@ class SkyStreamPlayerControlsState
   void initState() {
     super.initState();
     _isTv = ref.read(deviceProfileProvider).asData?.value.isTv ?? false;
+
+    _platformService = PlayerPlatformService();
+    _gestureHandler =
+        PlayerGestureHandler(
+          player: widget.player,
+          getSettings: () async =>
+              await ref.read(playerSettingsProvider.future),
+          isTv: _isTv,
+          isDesktop: Platform.isMacOS || Platform.isWindows || Platform.isLinux,
+          getDuration: () => _duration,
+          getPosition: () => _position,
+          onInteraction: () {
+            if (!_isVisible) {
+              setState(() => _isVisible = true);
+              widget.onVisibilityChanged?.call(true);
+            }
+            _startHideTimer();
+          },
+          onHideControls: () {
+            _cancelHideTimer();
+            if (_isVisible && mounted) {
+              setState(() => _isVisible = false);
+              widget.onVisibilityChanged?.call(false);
+            }
+          },
+          onSeekRelative: _seekRelative,
+          onDoubleTapAnimationStart: (isLeft, tapPos, seconds) {
+            if (mounted) {
+              setState(() {
+                _isSeekingLeft = isLeft;
+                _tapPosition = tapPos;
+              });
+              _seekAnimController.forward(from: 0.0);
+            }
+          },
+        )..addListener(() {
+          if (mounted) setState(() {});
+        });
+
     _playFocusNode = FocusNode();
     try {
       FlutterVolumeController.updateShowSystemUI(false);
@@ -333,7 +363,6 @@ class SkyStreamPlayerControlsState
     _playFocusNode.dispose();
     _backFocusNode.dispose();
     _hideTimer?.cancel();
-    _osdTimer?.cancel();
     _seekAnimController.dispose();
     for (final s in _subscriptions) {
       s.cancel();
@@ -353,81 +382,30 @@ class SkyStreamPlayerControlsState
   }
 
   void _updateOrientation() {
-    // Lock orientation on Desktop
-    try {
-      if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) return;
-    } catch (_) {}
-
-    final w = widget.player.state.width;
-    final h = widget.player.state.height;
-    if (w != null && h != null && w > 0 && h > 0) {
-      if (w >= h) {
-        SystemChrome.setPreferredOrientations([
-          DeviceOrientation.landscapeLeft,
-          DeviceOrientation.landscapeRight,
-        ]);
-      } else {
-        SystemChrome.setPreferredOrientations([
-          DeviceOrientation.portraitUp,
-          DeviceOrientation.portraitDown,
-        ]);
-      }
-    }
+    _platformService.updateOrientation(
+      widget.player.state.width,
+      widget.player.state.height,
+    );
   }
 
   Future<void> _enterPip() async {
-    try {
-      const platform = MethodChannel('dev.akash.skystream.player/pip');
-      await platform.invokeMethod('enterPip', {'isPlaying': _isPlaying});
-    } catch (e) {
-      debugPrint("PIP Error: $e");
-    }
+    await _platformService.enterPip(_isPlaying);
   }
 
   void _toggleOrientation() {
-    final orientation = MediaQuery.of(context).orientation;
-    if (orientation == Orientation.landscape) {
-      SystemChrome.setPreferredOrientations([
-        DeviceOrientation.portraitUp,
-        DeviceOrientation.portraitDown,
-      ]);
-    } else {
-      SystemChrome.setPreferredOrientations([
-        DeviceOrientation.landscapeLeft,
-        DeviceOrientation.landscapeRight,
-      ]);
-    }
+    _platformService.toggleOrientation(context);
   }
 
   Future<void> toggleFullscreen() async {
-    if (Platform.isAndroid || Platform.isIOS) return;
-    try {
-      final isFull = await windowManager.isFullScreen();
-      if (!isFull) {
-        // Going Custom Fullscreen (Hide TitleBar)
-        if (Platform.isWindows || Platform.isLinux) {
-          // Explicitly hide title bar to remove borders on Windows
-          await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
-        }
-        await windowManager.setFullScreen(true);
-      } else {
-        // Exiting Fullscreen
-        await windowManager.setFullScreen(false);
-        if (Platform.isWindows || Platform.isLinux) {
-          // Restore title bar
-          await windowManager.setTitleBarStyle(TitleBarStyle.normal);
-        }
-      }
-
-      if (mounted) {
-        setState(() {
-          _isFullscreen = !isFull;
-        });
-      }
-    } catch (_) {}
+    final nowFullscreen = await _platformService.toggleFullscreen();
+    if (mounted) {
+      setState(() {
+        _isFullscreen = nowFullscreen;
+      });
+    }
   }
 
-  void _handleDoubleTap() {
+  void _handleDoubleTap() async {
     // Desktop Double Tap -> Toggle Fullscreen
     try {
       if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
@@ -436,27 +414,12 @@ class SkyStreamPlayerControlsState
       }
     } catch (_) {}
 
-    if (widget.isLoading) return;
-    if (_duration == Duration.zero) return;
-
-    if (_tapPosition == null) return;
-    final settings = ref.read(playerSettingsProvider);
-    if (!settings.doubleTapEnabled) return;
-
-    final width = MediaQuery.of(context).size.width;
-    final isLeft = _tapPosition!.dx < width / 2;
-
-    setState(() {
-      _isSeekingLeft = isLeft;
-    });
-    _seekAnimController.forward(from: 0.0);
-
-    final seconds = settings.seekDuration;
-
-    if (_tapPosition!.dx < width / 2) {
-      _seekRelative(Duration(seconds: -seconds));
-    } else {
-      _seekRelative(Duration(seconds: seconds));
+    if (widget.isLoading || _duration == Duration.zero) return;
+    if (_tapPosition != null) {
+      _gestureHandler.handleDoubleTap(
+        _tapPosition!,
+        MediaQuery.of(context).size.width,
+      );
     }
   }
 
@@ -552,77 +515,18 @@ class SkyStreamPlayerControlsState
 
   // Keyboard shortcut handlers
   void toggleMute() {
-    final currentVol = widget.player.state.volume;
-    if (currentVol > 0) {
-      widget.player.setVolume(0);
-      _showToast("Mute", Icons.volume_off);
-    } else {
-      widget.player.setVolume(100);
-      changeVolume(0); // Trigger OSD update
-    }
+    _gestureHandler.toggleMute();
   }
 
   Future<void> changeVolume(double step) async {
-    double current = (await FlutterVolumeController.getVolume()) ?? 0.5;
-
-    // Volume boost logic
-    if (step > 0) {
-      if (current >= 1.0) {
-        // Increase boost beyond 100%
-        _boostLevel = (_boostLevel + step * 2).clamp(1.0, 2.0);
-        widget.player.setVolume(_boostLevel * 100);
-      } else {
-        // Adjust system volume
-        _boostLevel = 1.0;
-        widget.player.setVolume(100);
-        await FlutterVolumeController.setVolume(
-          (current + step).clamp(0.0, 1.0),
-        );
-      }
-    } else {
-      if (_boostLevel > 1.0) {
-        // Decrease boost
-        _boostLevel = (_boostLevel + step * 2).clamp(1.0, 2.0);
-        widget.player.setVolume(_boostLevel * 100);
-      } else {
-        // Decrease system volume
-        await FlutterVolumeController.setVolume(
-          (current + step).clamp(0.0, 1.0),
-        );
-      }
-    }
-
-    // Refresh current for OSD
-    current = (await FlutterVolumeController.getVolume()) ?? 0.5;
-
-    if (mounted) {
-      if (_isVisible) {
-        setState(() => _isVisible = false);
-        widget.onVisibilityChanged?.call(false);
-      }
-      setState(() {
-        _showOSD = true;
-        _osdIcon = _getIconForValue(PlayerGesture.volume, current);
-
-        // If boosted, show boost level
-        if (_boostLevel > 1.0) {
-          _osdValue = _boostLevel;
-          _osdLabel = "Volume ${(_boostLevel * 100).toInt()}%";
-        } else {
-          _osdValue = current;
-          _osdLabel = "Volume ${(current * 100).toInt()}%";
-        }
-      });
-      _osdTimer?.cancel();
-      _osdTimer = Timer(const Duration(seconds: 1), () {
-        if (mounted) setState(() => _showOSD = false);
-      });
-    }
+    await _gestureHandler.changeVolume(step);
   }
 
   void triggerSeek(bool isLeft) {
     final width = MediaQuery.of(context).size.width;
-    final settings = ref.read(playerSettingsProvider);
+    final settings =
+        ref.read(playerSettingsProvider).asData?.value ??
+        const PlayerSettings();
     final seconds = settings.seekDuration;
 
     setState(() {
@@ -643,23 +547,7 @@ class SkyStreamPlayerControlsState
       final labels = ["Fit", "Zoom", "Stretch"];
 
       widget.onResize?.call(modes[_resizeMode]);
-      _showToast(labels[_resizeMode], Icons.aspect_ratio);
-    });
-  }
-
-  void _showToast(String message, IconData icon) {
-    _hideTimer?.cancel();
-    setState(() {
-      _showOSD = true;
-      _osdIcon = icon;
-      _osdLabel = message;
-      _osdValue = null;
-      _osdAlignment = Alignment.bottomCenter;
-    });
-
-    _osdTimer?.cancel();
-    _osdTimer = Timer(const Duration(seconds: 2), () {
-      if (mounted) setState(() => _showOSD = false);
+      _gestureHandler.showToast(labels[_resizeMode], Icons.aspect_ratio);
     });
   }
 
@@ -1009,175 +897,38 @@ class SkyStreamPlayerControlsState
   // ... (keeping other methods same)
 
   Future<void> _handleDragStart(DragStartDetails details) async {
-    _animDuration = Duration.zero;
-    if (_isVisible) {
-      _cancelHideTimer();
-      setState(() => _isVisible = false);
-      widget.onVisibilityChanged?.call(false);
-    }
-
-    final width = MediaQuery.of(context).size.width;
-
-    // Disable vertical gestures on Desktop and TV
-    final profile = ref.read(deviceProfileProvider).asData?.value;
-    final isTv = profile?.isTv ?? false;
-    try {
-      if (isTv || Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
-        return;
-      }
-    } catch (_) {}
-
-    final x = details.globalPosition.dx;
-    final settings = ref.read(playerSettingsProvider);
-
-    PlayerGesture type = PlayerGesture.none;
-    if (x < width / 2) {
-      type = settings.leftGesture;
-      _osdAlignment = Alignment.centerRight; // Opposite side
-    } else {
-      type = settings.rightGesture;
-      _osdAlignment = Alignment.centerLeft; // Opposite side
-    }
-
-    if (type == PlayerGesture.none) return;
-
-    _currentGesture = type;
-
-    double startVal = 0.5;
-    if (type == PlayerGesture.brightness) {
-      try {
-        startVal = await ScreenBrightness().application;
-      } catch (e) {
-        startVal = 0.5;
-      }
-    } else {
-      startVal = (await FlutterVolumeController.getVolume()) ?? 0.5;
-      if (_boostLevel > 1.0) startVal = _boostLevel;
-    }
-
-    if (mounted) {
-      if (_isVisible) {
-        setState(() => _isVisible = false);
-        widget.onVisibilityChanged?.call(false);
-      }
-      setState(() {
-        _showOSD = true;
-        _osdIcon = _getIconForValue(type, startVal);
-        _osdValue = startVal;
-        _osdLabel = type == PlayerGesture.brightness ? "Brightness" : "Volume";
-      });
-    }
-    _osdTimer?.cancel();
+    await _gestureHandler.handleDragStart(
+      details,
+      MediaQuery.of(context).size.width,
+    );
   }
 
   void _handleDragUpdate(DragUpdateDetails details) {
-    if (_currentGesture == null || _currentGesture == PlayerGesture.none) {
-      return;
-    }
-
-    final delta = -details.primaryDelta! / 300;
-
-    // Auto brightness threshold (-0.05)
-    final double min = (_currentGesture == PlayerGesture.brightness)
-        ? -0.05
-        : 0.0;
-    // Volume boost limit (200%)
-    final double max = (_currentGesture == PlayerGesture.brightness)
-        ? 1.0
-        : 2.0;
-
-    final double newVal = ((_osdValue ?? 0.0) + delta).clamp(min, max);
-
-    // Update icon state
-    final newIcon = _getIconForValue(_currentGesture!, newVal);
-
-    setState(() {
-      _osdValue = newVal;
-      _osdIcon = newIcon;
-    });
-
-    if (_currentGesture == PlayerGesture.brightness) {
-      if (newVal <= 0.0) {
-        ScreenBrightness().resetApplicationScreenBrightness();
-        setState(() => _osdLabel = "Auto");
-      } else {
-        ScreenBrightness().setApplicationScreenBrightness(newVal);
-        setState(() => _osdLabel = "Brightness");
-      }
-    } else {
-      // Handle volume boost
-      if (newVal > 1.0) {
-        _boostLevel = newVal;
-        widget.player.setVolume(newVal * 100);
-      } else {
-        _boostLevel = 1.0;
-        widget.player.setVolume(100);
-        FlutterVolumeController.setVolume(newVal);
-      }
-    }
+    _gestureHandler.handleDragUpdate(details);
   }
 
   void _handleDragEnd(DragEndDetails details) {
-    _currentGesture = null;
-    _osdTimer = Timer(const Duration(seconds: 1), () {
-      if (mounted) setState(() => _showOSD = false);
-    });
+    _gestureHandler.handleDragEnd(details);
   }
 
   // Horizontal Seek
-  void _handleHorizontalDragStart(DragStartDetails details) {
-    if (widget.isLoading || _duration == Duration.zero) return;
-    if (_isLocked) return;
-
-    // Check settings
-    if (!ref.read(playerSettingsProvider).swipeSeekEnabled) return;
-
-    // Disable touch gestures on desktop and TV
-    final profile = ref.read(deviceProfileProvider).asData?.value;
-    final isTv = profile?.isTv ?? false;
-    try {
-      if (isTv || Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
-        return;
-      }
-    } catch (_) {}
-
-    // Avoid conflict with seek bar
-    if (_isVisible) {
-      final height = MediaQuery.of(context).size.height;
-      final bottomPadding = MediaQuery.of(context).viewPadding.bottom;
-      if (details.globalPosition.dy > (height - 100 - bottomPadding)) {
-        return;
-      }
-
-      // Hide controls when starting swipe seek
-      _cancelHideTimer();
-      setState(() => _isVisible = false);
-      widget.onVisibilityChanged?.call(false);
-    }
-
-    setState(() {
-      _swipeSeekValue = _position;
-    });
+  void _handleHorizontalDragStart(DragStartDetails details) async {
+    final height = MediaQuery.of(context).size.height;
+    final bottomPadding = MediaQuery.of(context).viewPadding.bottom;
+    await _gestureHandler.handleHorizontalDragStart(
+      details,
+      _isVisible,
+      height,
+      bottomPadding,
+    );
   }
 
   void _handleHorizontalDragUpdate(DragUpdateDetails details) {
-    if (_swipeSeekValue == null) return;
-
-    final delta = details.primaryDelta ?? 0;
-    final newMs = (_swipeSeekValue!.inMilliseconds + (delta * 200)).toInt();
-    final clamped = newMs.clamp(0, _duration.inMilliseconds);
-
-    setState(() {
-      _swipeSeekValue = Duration(milliseconds: clamped);
-    });
+    _gestureHandler.handleHorizontalDragUpdate(details);
   }
 
   void _handleHorizontalDragEnd(DragEndDetails details) {
-    if (_swipeSeekValue == null) return;
-    widget.player.seek(_swipeSeekValue!);
-    setState(() {
-      _swipeSeekValue = null;
-    });
+    _gestureHandler.handleHorizontalDragEnd(details);
   }
 
   String _formatDuration(Duration duration) {
@@ -1192,8 +943,8 @@ class SkyStreamPlayerControlsState
   }
 
   Widget _buildKickAnimation() {
-    final settings = ref.read(playerSettingsProvider);
-    final int seconds = settings.seekDuration;
+    final seconds =
+        ref.read(playerSettingsProvider).asData?.value.seekDuration ?? 10;
 
     return FadeTransition(
       opacity: Tween<double>(begin: 0.0, end: 1.0).animate(
@@ -1304,8 +1055,8 @@ class SkyStreamPlayerControlsState
         onDoubleTap: _handleDoubleTap,
         child: GestureDetector(
           onTap: () {
-            if (_showOSD) {
-              setState(() => _showOSD = false);
+            if (_gestureHandler.showOSD) {
+              setState(() => _gestureHandler.showOSD = false);
             }
             if (_isLocked) {
               setState(() => _isVisible = !_isVisible);
@@ -1364,7 +1115,7 @@ class SkyStreamPlayerControlsState
                 ),
 
                 // Seek feedback overlay
-                if (_swipeSeekValue != null)
+                if (_gestureHandler.swipeSeekValue != null)
                   Center(
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -1376,7 +1127,7 @@ class SkyStreamPlayerControlsState
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Text(
-                        "${_formatDuration(_swipeSeekValue!)} / ${_formatDuration(_duration)}",
+                        "${_formatDuration(_gestureHandler.swipeSeekValue!)} / ${_formatDuration(_duration)}",
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 24,
@@ -1387,20 +1138,20 @@ class SkyStreamPlayerControlsState
                   ),
 
                 // Volume/Brightness OSD
-                if (_showOSD)
+                if (_gestureHandler.showOSD)
                   if (Platform.isMacOS ||
                       Platform.isWindows ||
                       Platform.isLinux)
                     _buildDesktopHorizontalOSD()
                   else
                     Align(
-                      alignment: _osdAlignment,
+                      alignment: _gestureHandler.osdAlignment,
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 24,
                           vertical: 32,
                         ),
-                        child: _osdValue == null
+                        child: _gestureHandler.osdValue == null
                             ? Container(
                                 // TOAST MODE
                                 padding: const EdgeInsets.symmetric(
@@ -1415,15 +1166,17 @@ class SkyStreamPlayerControlsState
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(
-                                      _osdIcon,
-                                      color: ((_osdValue ?? 0) > 1.0)
+                                      _gestureHandler.osdIcon,
+                                      color:
+                                          ((_gestureHandler.osdValue ?? 0) >
+                                              1.0)
                                           ? Colors.orange
                                           : Colors.white,
                                       size: 24,
                                     ),
                                     const SizedBox(width: 12),
                                     Text(
-                                      _osdLabel,
+                                      _gestureHandler.osdLabel,
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 16,
@@ -1447,11 +1200,13 @@ class SkyStreamPlayerControlsState
                                 child: Column(
                                   children: [
                                     Text(
-                                      _osdLabel == "Auto"
+                                      _gestureHandler.osdLabel == "Auto"
                                           ? "Auto"
-                                          : "${((_osdValue ?? 0) * 100).toInt()}",
+                                          : "${((_gestureHandler.osdValue ?? 0) * 100).toInt()}",
                                       style: TextStyle(
-                                        color: ((_osdValue ?? 0) > 1.0)
+                                        color:
+                                            ((_gestureHandler.osdValue ?? 0) >
+                                                1.0)
                                             ? Colors.orange
                                             : Colors.white,
                                         fontSize: 15,
@@ -1479,16 +1234,19 @@ class SkyStreamPlayerControlsState
                                               LayoutBuilder(
                                                 builder: (context, constraints) {
                                                   final bool isBrightness =
-                                                      _osdLabel ==
+                                                      _gestureHandler
+                                                              .osdLabel ==
                                                           "Brightness" ||
-                                                      _osdLabel == "Auto";
+                                                      _gestureHandler
+                                                              .osdLabel ==
+                                                          "Auto";
                                                   // Brightness 0-1 maps to 1.0 height
                                                   // Volume 0-2 maps to 0.5 * Val height
                                                   final double val =
-                                                      (_osdValue ?? 0).clamp(
-                                                        0.0,
-                                                        1.0,
-                                                      );
+                                                      (_gestureHandler
+                                                                  .osdValue ??
+                                                              0)
+                                                          .clamp(0.0, 1.0);
                                                   final double scale =
                                                       isBrightness ? 1.0 : 0.5;
 
@@ -1505,13 +1263,20 @@ class SkyStreamPlayerControlsState
                                                 },
                                               ),
                                               // Orange Bar (Volume Boost only)
-                                              if ((_osdValue ?? 0) > 1.0 &&
-                                                  !(_osdLabel == "Brightness" ||
-                                                      _osdLabel == "Auto"))
+                                              if ((_gestureHandler.osdValue ??
+                                                          0) >
+                                                      1.0 &&
+                                                  !(_gestureHandler.osdLabel ==
+                                                          "Brightness" ||
+                                                      _gestureHandler
+                                                              .osdLabel ==
+                                                          "Auto"))
                                                 LayoutBuilder(
                                                   builder: (ctx, constraints) {
                                                     final double boost =
-                                                        (_osdValue! - 1.0)
+                                                        (_gestureHandler
+                                                                    .osdValue! -
+                                                                1.0)
                                                             .clamp(0.0, 1.0);
                                                     // Boost percentage determines height of orange bar (max 50% of total)
                                                     final double orangeHeight =
@@ -1551,9 +1316,11 @@ class SkyStreamPlayerControlsState
                                             child: child,
                                           ),
                                       child: Icon(
-                                        _osdIcon,
-                                        key: ValueKey(_osdIcon),
-                                        color: ((_osdValue ?? 0) > 1.0)
+                                        _gestureHandler.osdIcon,
+                                        key: ValueKey(_gestureHandler.osdIcon),
+                                        color:
+                                            ((_gestureHandler.osdValue ?? 0) >
+                                                1.0)
                                             ? Colors.orange
                                             : Colors.white,
                                         size: 24,
@@ -1573,7 +1340,7 @@ class SkyStreamPlayerControlsState
   }
 
   Widget _buildDesktopHorizontalOSD() {
-    final bool isLevel = _osdValue != null;
+    final bool isLevel = _gestureHandler.osdValue != null;
     return Positioned(
       top: 80,
       left: 0,
@@ -1590,8 +1357,10 @@ class SkyStreamPlayerControlsState
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                _osdIcon,
-                color: ((_osdValue ?? 0) > 1.0) ? Colors.orange : Colors.white,
+                _gestureHandler.osdIcon,
+                color: ((_gestureHandler.osdValue ?? 0) > 1.0)
+                    ? Colors.orange
+                    : Colors.white,
                 size: 24,
               ),
               const SizedBox(width: 12),
@@ -1599,7 +1368,7 @@ class SkyStreamPlayerControlsState
                 Expanded(
                   child: Center(
                     child: Text(
-                      _osdLabel,
+                      _gestureHandler.osdLabel,
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14,
@@ -1622,12 +1391,10 @@ class SkyStreamPlayerControlsState
                           LayoutBuilder(
                             builder: (context, constraints) {
                               final bool isBrightness =
-                                  _osdLabel == "Brightness" ||
-                                  _osdLabel == "Auto";
-                              final double val = (_osdValue ?? 0).clamp(
-                                0.0,
-                                1.0,
-                              );
+                                  _gestureHandler.osdLabel == "Brightness" ||
+                                  _gestureHandler.osdLabel == "Auto";
+                              final double val = (_gestureHandler.osdValue ?? 0)
+                                  .clamp(0.0, 1.0);
                               final double scale = isBrightness ? 1.0 : 0.5;
                               return FractionallySizedBox(
                                 widthFactor: val * scale,
@@ -1636,13 +1403,14 @@ class SkyStreamPlayerControlsState
                             },
                           ),
                           // Boost indicator
-                          if ((_osdValue ?? 0) > 1.0)
+                          if ((_gestureHandler.osdValue ?? 0) > 1.0)
                             LayoutBuilder(
                               builder: (context, constraints) {
-                                final double boost = (_osdValue! - 1.0).clamp(
-                                  0.0,
-                                  1.0,
-                                );
+                                final double boost =
+                                    (_gestureHandler.osdValue! - 1.0).clamp(
+                                      0.0,
+                                      1.0,
+                                    );
                                 // Boost fills remaining space
                                 final double width =
                                     constraints.maxWidth * (boost * 0.5);
@@ -1664,10 +1432,10 @@ class SkyStreamPlayerControlsState
                 SizedBox(
                   width: 40, // Fixed width for stable layout
                   child: Text(
-                    "${((_osdValue! * 100).toInt())}%",
+                    "${((_gestureHandler.osdValue! * 100).toInt())}%",
                     textAlign: TextAlign.right,
                     style: TextStyle(
-                      color: ((_osdValue ?? 0) > 1.0)
+                      color: ((_gestureHandler.osdValue ?? 0) > 1.0)
                           ? Colors.orange
                           : Colors.white,
                       fontSize: 14,
@@ -1717,20 +1485,6 @@ class SkyStreamPlayerControlsState
         ),
       ),
     );
-  }
-
-  IconData _getIconForValue(PlayerGesture type, double value) {
-    if (type == PlayerGesture.brightness) {
-      if (value <= 0.0) return Icons.brightness_auto;
-      if (value < 0.3) return Icons.brightness_low;
-      if (value < 0.7) return Icons.brightness_medium;
-      return Icons.brightness_high;
-    } else {
-      if (value <= 0.0) return Icons.volume_off;
-      if (value < 0.33) return Icons.volume_mute;
-      if (value < 0.66) return Icons.volume_down;
-      return Icons.volume_up;
-    }
   }
 
   Widget _buildLockedUI() {

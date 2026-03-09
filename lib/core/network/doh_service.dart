@@ -2,11 +2,17 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// DNS over HTTPS provider options.
 enum DohProvider {
   cloudflare, // https://cloudflare-dns.com/dns-query
   google, // https://dns.google/dns-query
+  adguard, // https://dns.adguard.com/dns-query
+  dnsWatch, // https://resolver2.dns.watch/dns-query
+  quad9, // https://dns.quad9.net/dns-query
+  dnsSb, // https://doh.dns.sb/dns-query
+  canadianShield, // https://private.canadianshield.cira.ca/dns-query
   custom, // User-defined URL
 }
 
@@ -35,31 +41,68 @@ class DohSettings {
   }
 }
 
-class DohSettingsNotifier extends Notifier<DohSettings> {
+class DohSettingsNotifier extends AsyncNotifier<DohSettings> {
+  static const _kEnabledKey = 'doh_enabled';
+  static const _kProviderKey = 'doh_provider';
+  static const _kCustomUrlKey = 'doh_custom_url';
+
   @override
-  DohSettings build() => const DohSettings();
-
-  void setEnabled(bool value) {
-    state = state.copyWith(enabled: value);
-    DohService.instance._syncFromSettings(state);
+  Future<DohSettings> build() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final enabled = prefs.getBool(_kEnabledKey) ?? false;
+      final providerName = prefs.getString(_kProviderKey);
+      final customUrl = prefs.getString(_kCustomUrlKey) ?? '';
+      final provider = DohProvider.values.firstWhere(
+        (p) => p.name == providerName,
+        orElse: () => DohProvider.cloudflare,
+      );
+      final settings = DohSettings(
+        enabled: enabled,
+        provider: provider,
+        customUrl: customUrl,
+      );
+      DohService.instance._syncFromSettings(settings);
+      return settings;
+    } catch (_) {
+      return const DohSettings();
+    }
   }
 
-  void setProvider(DohProvider p) {
-    state = state.copyWith(provider: p);
-    DohService.instance._syncFromSettings(state);
+  Future<void> setEnabled(bool value) async {
+    final current = state.asData?.value ?? const DohSettings();
+    final updated = current.copyWith(enabled: value);
+    state = AsyncData(updated);
+    DohService.instance._syncFromSettings(updated);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kEnabledKey, value);
   }
 
-  void setCustomUrl(String url) {
-    state = state.copyWith(customUrl: url);
-    DohService.instance._syncFromSettings(state);
+  Future<void> setProvider(DohProvider p) async {
+    final current = state.asData?.value ?? const DohSettings();
+    final updated = current.copyWith(provider: p);
+    state = AsyncData(updated);
+    DohService.instance._syncFromSettings(updated);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kProviderKey, p.name);
+  }
+
+  Future<void> setCustomUrl(String url) async {
+    final current = state.asData?.value ?? const DohSettings();
+    final updated = current.copyWith(customUrl: url);
+    state = AsyncData(updated);
+    DohService.instance._syncFromSettings(updated);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kCustomUrlKey, url);
   }
 
   void clearCache() => DohService.instance.clearCache();
 }
 
-final dohSettingsProvider = NotifierProvider<DohSettingsNotifier, DohSettings>(
-  DohSettingsNotifier.new,
-);
+final dohSettingsProvider =
+    AsyncNotifierProvider<DohSettingsNotifier, DohSettings>(
+      DohSettingsNotifier.new,
+    );
 
 /// A DNS-over-HTTPS resolver that queries Cloudflare or Google for DNS records.
 ///
@@ -100,6 +143,16 @@ class DohService {
         return 'https://cloudflare-dns.com/dns-query';
       case DohProvider.google:
         return 'https://dns.google/dns-query';
+      case DohProvider.adguard:
+        return 'https://dns.adguard.com/dns-query';
+      case DohProvider.dnsWatch:
+        return 'https://resolver2.dns.watch/dns-query';
+      case DohProvider.quad9:
+        return 'https://dns.quad9.net/dns-query';
+      case DohProvider.dnsSb:
+        return 'https://doh.dns.sb/dns-query';
+      case DohProvider.canadianShield:
+        return 'https://private.canadianshield.cira.ca/dns-query';
       case DohProvider.custom:
         return _customUrl;
     }

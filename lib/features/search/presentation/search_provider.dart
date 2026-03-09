@@ -16,6 +16,86 @@ class ProviderSearchResult {
   });
 }
 
+/// Shared search orchestration — the single source of truth for provider
+/// fan-out, result mapping, and prefix filtering. Returns results
+/// incrementally as each provider completes.
+Stream<List<ProviderSearchResult>> searchAllProviders(
+  String query,
+  ExtensionManager manager,
+) async* {
+  final providers = manager.getAllProviders();
+
+  if (query.length < 2 || providers.isEmpty) {
+    yield [];
+    return;
+  }
+
+  final results = <ProviderSearchResult>[];
+  final queryLower = query.toLowerCase();
+  final queryParts = queryLower.split(' ').where((s) => s.isNotEmpty).toList();
+
+  for (final provider in providers) {
+    try {
+      final rawResults = await provider.search(query);
+
+      final providerResults = rawResults
+          .map(
+            (item) => MultimediaItem(
+              title: item.title,
+              url: item.url,
+              posterUrl: item.posterUrl,
+              bannerUrl: item.bannerUrl,
+              description: item.description,
+              isFolder: item.isFolder,
+              episodes: item.episodes,
+              provider: provider.id,
+            ),
+          )
+          .toList();
+
+      final filtered = providerResults.where((item) {
+        final titleLower = item.title.toLowerCase();
+        final titleParts = titleLower
+            .split(' ')
+            .where((s) => s.isNotEmpty)
+            .toList();
+
+        for (final qPart in queryParts) {
+          bool foundPrefix = false;
+          for (final tPart in titleParts) {
+            if (tPart.startsWith(qPart)) {
+              foundPrefix = true;
+              break;
+            }
+          }
+          if (!foundPrefix) return false;
+        }
+        return true;
+      }).toList();
+
+      results.add(
+        ProviderSearchResult(
+          providerId: provider.id,
+          providerName: provider.name,
+          results: filtered,
+        ),
+      );
+
+      yield List.from(results);
+    } catch (e) {
+      results.add(
+        ProviderSearchResult(
+          providerId: provider.id,
+          providerName: provider.name,
+          results: [],
+          error: e.toString(),
+        ),
+      );
+      yield List.from(results);
+    }
+  }
+}
+
 // State for the search query
 class SearchQueryNotifier extends Notifier<String> {
   @override
@@ -28,87 +108,10 @@ final searchQueryProvider = NotifierProvider<SearchQueryNotifier, String>(
   SearchQueryNotifier.new,
 );
 
-// P8: StreamProvider for incremental search results - shows results as they arrive
+// Incremental search results — delegates to shared searchAllProviders()
 final searchResultsProvider =
-    StreamProvider.autoDispose<List<ProviderSearchResult>>((ref) async* {
+    StreamProvider.autoDispose<List<ProviderSearchResult>>((ref) {
       final query = ref.watch(searchQueryProvider);
       final manager = ref.read(extensionManagerProvider.notifier);
-      final providers = manager.getAllProviders();
-
-      if (query.length < 2) {
-        yield [];
-        return;
-      }
-
-      final results = <ProviderSearchResult>[];
-      final queryLower = query.toLowerCase(); // Cache once, not per-item
-      final queryParts = queryLower
-          .split(' ')
-          .where((s) => s.isNotEmpty)
-          .toList();
-
-      // Process each provider and yield incrementally
-      for (final provider in providers) {
-        try {
-          final rawResults = await provider.search(query);
-
-          // Inject provider ID into items
-          final providerResults = rawResults
-              .map(
-                (item) => MultimediaItem(
-                  title: item.title,
-                  url: item.url,
-                  posterUrl: item.posterUrl,
-                  bannerUrl: item.bannerUrl,
-                  description: item.description,
-                  isFolder: item.isFolder,
-                  episodes: item.episodes,
-                  provider: provider.id,
-                ),
-              )
-              .toList();
-
-          // Filter with optimized logic
-          final filtered = providerResults.where((item) {
-            final titleLower = item.title.toLowerCase();
-            final titleParts = titleLower
-                .split(' ')
-                .where((s) => s.isNotEmpty)
-                .toList();
-
-            for (final qPart in queryParts) {
-              bool foundPrefix = false;
-              for (final tPart in titleParts) {
-                if (tPart.startsWith(qPart)) {
-                  foundPrefix = true;
-                  break;
-                }
-              }
-              if (!foundPrefix) return false;
-            }
-            return true;
-          }).toList();
-
-          results.add(
-            ProviderSearchResult(
-              providerId: provider.id,
-              providerName: provider.name,
-              results: filtered,
-            ),
-          );
-
-          // P8: Yield after each provider completes - UI updates incrementally!
-          yield List.from(results);
-        } catch (e) {
-          results.add(
-            ProviderSearchResult(
-              providerId: provider.id,
-              providerName: provider.name,
-              results: [],
-              error: e.toString(),
-            ),
-          );
-          yield List.from(results);
-        }
-      }
+      return searchAllProviders(query, manager);
     });

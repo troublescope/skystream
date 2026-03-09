@@ -9,7 +9,7 @@ class LanguageSelectorDialog extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final languages = ref.watch(languageListProvider);
-    final currentLang = ref.watch(languageProvider);
+    final currentLang = ref.watch(languageProvider).asData?.value ?? 'en-US';
 
     return BackdropFilter(
       filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
