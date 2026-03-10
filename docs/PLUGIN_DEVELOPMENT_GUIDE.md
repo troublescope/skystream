@@ -95,8 +95,8 @@ Create a JSON file that lists the actual plugins.
     "version": 1,
     "description": "Watch movies from Example.com",
     "authors": ["YourName"],
-    "language": "en",
-    "types": ["Movies", "TV"]
+    "languages": ["en"],
+    "categories": ["Movie", "TvSeries"]
   }
 ]
 ```

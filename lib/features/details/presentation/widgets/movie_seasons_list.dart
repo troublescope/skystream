@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../../../core/config/tmdb_config.dart';
+import '../../../../core/utils/image_fallbacks.dart';
 import '../../../../shared/widgets/cards_wrapper.dart';
 import '../../../../shared/widgets/shimmer_placeholder.dart';
 import '../../../../shared/widgets/desktop_scroll_wrapper.dart';
@@ -154,7 +154,6 @@ class _MovieSeasonsListState extends ConsumerState<MovieSeasonsList> {
               separatorBuilder: (_, _) => const SizedBox(width: 12),
               itemBuilder: (context, index) {
                 final season = widget.seasons[index];
-                final posterPath = season.posterPath;
                 final seasonNum = season.seasonNumber;
 
                 return Consumer(
@@ -192,21 +191,11 @@ class _MovieSeasonsListState extends ConsumerState<MovieSeasonsList> {
                             Expanded(
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(10),
-                                child: posterPath != null
-                                    ? CachedNetworkImage(
-                                        imageUrl:
-                                            '${TmdbConfig.imageBaseUrl}$posterPath',
-                                        fit: BoxFit.cover,
-                                        width: double.infinity,
-                                      )
-                                    : Container(
-                                        color: Colors.grey[800],
-                                        alignment: Alignment.center,
-                                        child: const Icon(
-                                          Icons.movie,
-                                          size: 40,
-                                        ),
-                                      ),
+                                child: CachedNetworkImage(
+                                  imageUrl: season.posterImageUrl,
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                ),
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -284,7 +273,10 @@ class _MovieSeasonsListState extends ConsumerState<MovieSeasonsList> {
                   separatorBuilder: (_, _) => const SizedBox(width: 20),
                   itemBuilder: (context, index) {
                     final ep = episodes[index];
-                    final img = ep['still_path'];
+                    final imageUrl = AppImageFallbacks.tmdbStill(
+                      ep['still_path'],
+                      label: ep['name'] ?? 'Episode',
+                    );
                     final voteAverage =
                         (ep['vote_average'] as num?)?.toDouble() ?? 0.0;
                     final runtime = ep['runtime'] as int? ?? 0;
@@ -326,14 +318,13 @@ class _MovieSeasonsListState extends ConsumerState<MovieSeasonsList> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Expanded(
-                              child: img != null
-                                  ? CachedNetworkImage(
-                                      imageUrl:
-                                          '${TmdbConfig.imageBaseUrl}$img',
-                                      fit: BoxFit.cover,
-                                      width: double.infinity,
-                                    )
-                                  : const Center(child: ShimmerPlaceholder()),
+                              child: CachedNetworkImage(
+                                imageUrl: imageUrl,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                placeholder: (_, _) =>
+                                    const Center(child: ShimmerPlaceholder()),
+                              ),
                             ),
                             Padding(
                               padding: const EdgeInsets.all(12),
@@ -457,7 +448,10 @@ class _MovieSeasonsListState extends ConsumerState<MovieSeasonsList> {
                   separatorBuilder: (_, _) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final ep = episodes[index];
-                    final epImg = ep['still_path'];
+                    final imageUrl = AppImageFallbacks.tmdbStill(
+                      ep['still_path'],
+                      label: ep['name'] ?? 'Episode',
+                    );
                     final voteAverage =
                         (ep['vote_average'] as num?)?.toDouble() ?? 0.0;
                     final runtime = (ep['runtime'] as int?) ?? 0;
@@ -494,22 +488,12 @@ class _MovieSeasonsListState extends ConsumerState<MovieSeasonsList> {
                               height: 68,
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(8),
-                                image: epImg != null
-                                    ? DecorationImage(
-                                        image: NetworkImage(
-                                          '${TmdbConfig.imageBaseUrl}$epImg',
-                                        ),
-                                        fit: BoxFit.cover,
-                                      )
-                                    : null,
+                                image: DecorationImage(
+                                  image: NetworkImage(imageUrl),
+                                  fit: BoxFit.cover,
+                                ),
                                 color: Colors.grey[800],
                               ),
-                              child: epImg == null
-                                  ? const Icon(
-                                      Icons.movie,
-                                      color: Colors.white54,
-                                    )
-                                  : null,
                             ),
                             const SizedBox(width: 12),
                             Expanded(

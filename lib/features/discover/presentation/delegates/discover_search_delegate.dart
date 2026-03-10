@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
-import '../../../../core/config/tmdb_config.dart';
 import '../../../../shared/widgets/shimmer_placeholder.dart';
 import '../../../details/presentation/tmdb_movie_details_screen.dart';
 import '../controllers/discover_search_controller.dart';
@@ -142,26 +141,18 @@ class _SearchSuggestionsListState
         final item = suggestions[index];
         final title = item.title;
         final year = item.releaseDate.split('-').first;
-        final posterPath = item.posterPath;
         final mediaType = item.mediaType;
 
         return ListTile(
           leading: ClipRRect(
             borderRadius: BorderRadius.circular(4),
-            child: posterPath != null
-                ? CachedNetworkImage(
-                    imageUrl: '${TmdbConfig.profileSizeUrl}$posterPath',
-                    width: 40,
-                    height: 60,
-                    fit: BoxFit.cover,
-                    placeholder: (_, _) => const ShimmerPlaceholder(),
-                  )
-                : Container(
-                    width: 40,
-                    height: 60,
-                    color: Colors.grey[800],
-                    child: const Icon(Icons.movie, size: 20),
-                  ),
+            child: CachedNetworkImage(
+              imageUrl: item.thumbnailImageUrl,
+              width: 40,
+              height: 60,
+              fit: BoxFit.cover,
+              placeholder: (_, _) => const ShimmerPlaceholder(),
+            ),
           ),
           title: Text(
             title,
@@ -323,10 +314,7 @@ class _SearchResultsGridState extends ConsumerState<_SearchResultsGrid> {
         }
 
         final item = results[index];
-        final posterPath = item.posterPath;
-        final imageUrl = posterPath != null
-            ? '${TmdbConfig.posterSizeUrl}$posterPath'
-            : 'https://via.placeholder.com/150x225';
+        final imageUrl = item.posterImageUrl;
         final title = item.title;
         final id = item.id;
         final mediaType = item.mediaType;

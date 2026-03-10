@@ -1,5 +1,6 @@
 import 'package:html_unescape/html_unescape.dart';
 import '../domain/entity/multimedia_item.dart';
+import '../utils/image_fallbacks.dart';
 
 class TmdbItem {
   static final _unescape = HtmlUnescape();
@@ -93,4 +94,13 @@ class TmdbItem {
       'overview': overview,
     };
   }
+
+  String get posterImageUrl =>
+      AppImageFallbacks.tmdbPoster(posterPath, label: title);
+
+  String get thumbnailImageUrl =>
+      AppImageFallbacks.tmdbThumbnail(posterPath, label: title);
+
+  String get backdropImageUrl =>
+      AppImageFallbacks.tmdbBackdrop(backdropPath ?? posterPath, label: title);
 }

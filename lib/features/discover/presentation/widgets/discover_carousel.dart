@@ -2,7 +2,6 @@ import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import '../../../../core/config/tmdb_config.dart';
 import '../../../../shared/widgets/cards_wrapper.dart';
 import '../../../details/presentation/tmdb_movie_details_screen.dart';
 import '../../../../shared/widgets/shimmer_placeholder.dart';
@@ -176,19 +175,7 @@ class _DiscoverCarouselState extends State<DiscoverCarousel> {
     TmdbItem movie,
     double height,
   ) {
-    final posterPath = movie.posterPath;
-    final backdropPath = movie.backdropPath ?? posterPath;
-    String imageUrl;
-    if (backdropPath != null) {
-      if (backdropPath.startsWith('http')) {
-        imageUrl = backdropPath;
-      } else {
-        imageUrl = '${TmdbConfig.backdropSizeUrl}$backdropPath';
-      }
-    } else {
-      imageUrl = 'https://via.placeholder.com/500x750';
-    }
-
+    final imageUrl = movie.backdropImageUrl;
     final title = movie.title;
     final logoUrl = movie.logoUrl;
 

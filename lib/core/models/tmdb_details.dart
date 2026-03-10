@@ -1,5 +1,6 @@
 import 'package:html_unescape/html_unescape.dart';
 import 'tmdb_item.dart';
+import '../utils/image_fallbacks.dart';
 
 // Reuse unescape from parent or create local
 final _unescape = HtmlUnescape();
@@ -235,6 +236,9 @@ class TmdbSeason {
       airDate: json['air_date'],
     );
   }
+
+  String get posterImageUrl =>
+      AppImageFallbacks.tmdbPoster(posterPath, label: name);
 }
 
 class TmdbCast {
@@ -253,6 +257,9 @@ class TmdbCast {
       profilePath: json['profile_path'],
     );
   }
+
+  String get profileImageUrl =>
+      AppImageFallbacks.tmdbProfile(profilePath, label: name);
 }
 
 class TmdbVideo {
@@ -283,4 +290,6 @@ class TmdbProductionCompany {
       logoPath: json['logo_path'],
     );
   }
+
+  String get logoImageUrl => AppImageFallbacks.tmdbLogo(logoPath, label: name);
 }

@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/models/tmdb_details.dart';
 import 'package:intl/intl.dart';
-import '../../../../core/config/tmdb_config.dart';
 
 import 'widgets/provider_search_section.dart';
 import '../../../../core/utils/responsive_breakpoints.dart';
@@ -147,7 +146,7 @@ class _TmdbMovieDetailsScreenState
 
   Widget _buildDesktopLayout(TmdbDetails data) {
     final isMovie = widget.mediaType == 'movie';
-    final backdropPath = data.backdropPath;
+    final backdropImageUrl = data.backdropImageUrl;
     final title = data.title;
     final overview = data.overview;
 
@@ -200,25 +199,24 @@ class _TmdbMovieDetailsScreenState
       body: Stack(
         fit: StackFit.expand,
         children: [
-          if (backdropPath != null)
-            Positioned.fill(
-              child: ShaderMask(
-                shaderCallback: (rect) {
-                  return LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [scaffoldColor, Colors.transparent],
-                    stops: const [0.2, 1.0],
-                  ).createShader(rect);
-                },
-                blendMode: BlendMode.dstOut,
-                child: CachedNetworkImage(
-                  imageUrl: '${TmdbConfig.imageBaseUrl}$backdropPath',
-                  fit: BoxFit.cover,
-                  alignment: Alignment.centerRight,
-                ),
+          Positioned.fill(
+            child: ShaderMask(
+              shaderCallback: (rect) {
+                return LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [scaffoldColor, Colors.transparent],
+                  stops: const [0.2, 1.0],
+                ).createShader(rect);
+              },
+              blendMode: BlendMode.dstOut,
+              child: CachedNetworkImage(
+                imageUrl: backdropImageUrl,
+                fit: BoxFit.cover,
+                alignment: Alignment.centerRight,
               ),
             ),
+          ),
 
           Positioned.fill(
             child: Container(
@@ -587,7 +585,7 @@ class _TmdbMovieDetailsScreenState
   Widget _buildMobileLayout(TmdbDetails data) {
     final isMovie = widget.mediaType == 'movie';
 
-    final backdropPath = data.backdropPath;
+    final backdropImageUrl = data.backdropImageUrl;
     final title = data.title;
     final overview = data.overview;
 
@@ -681,24 +679,23 @@ class _TmdbMovieDetailsScreenState
                   fit: StackFit.expand,
                   children: [
                     // Backdrop Image
-                    if (backdropPath != null)
-                      Transform.translate(
-                        offset: Offset(0, parallaxOffset),
-                        child: CachedNetworkImage(
-                          imageUrl: '${TmdbConfig.imageBaseUrl}$backdropPath',
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.surfaceContainerHighest,
-                          ),
-                          errorWidget: (context, url, error) => Container(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.surfaceContainerHighest,
-                          ),
+                    Transform.translate(
+                      offset: Offset(0, parallaxOffset),
+                      child: CachedNetworkImage(
+                        imageUrl: backdropImageUrl,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Container(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
                         ),
                       ),
+                    ),
 
                     // Gradient Overlay
                     Container(

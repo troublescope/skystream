@@ -59,8 +59,8 @@ sequenceDiagram
     "id": "com.example.provider", // Unique ID
     "version": 1,
     "baseUrl": "https://example.com",
-    "type": "Movie", // "Movie", "Tv", "Anime"
-    "language": "en"
+    "categories": ["Movie"], // "Movie", "TvSeries", "Anime", "LiveTv"
+    "languages": ["en"]
 }
 ```
 
@@ -72,8 +72,8 @@ function getManifest() {
         id: "com.example.myprovider",
         version: 1,
         baseUrl: "https://example.com",
-        type: "Movie",
-        language: "en"
+        categories: ["Movie"],
+        languages: ["en"]
     };
 }
 const mainUrl = "https://example.com";

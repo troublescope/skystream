@@ -133,10 +133,72 @@ class JsBasedProvider extends SkyStreamProvider {
   String get version => (_manifest['version'] ?? 0).toString();
 
   @override
-  String get lang => _manifest['lang'] ?? "en";
+  List<String> get languages => _readManifestStringList(
+    ['languages', 'language', 'lang'],
+    fallback: const ['en'],
+  );
 
   @override
-  Set<ProviderType> get supportedTypes => {ProviderType.movie};
+  Set<ProviderType> get supportedTypes {
+    final categories = _readManifestStringList([
+      'categories',
+      'tvTypes',
+      'types',
+    ]);
+    if (categories.isEmpty) {
+      return {ProviderType.movie};
+    }
+
+    final mapped = categories.map(_mapProviderType).toSet();
+    if (mapped.isEmpty) {
+      return {ProviderType.movie};
+    }
+    return mapped;
+  }
+
+  List<String> _readManifestStringList(
+    List<String> keys, {
+    List<String> fallback = const [],
+  }) {
+    for (final key in keys) {
+      final value = _manifest[key];
+      if (value is List) {
+        final parsed = value.map((e) => e.toString()).toList();
+        if (parsed.isNotEmpty) {
+          return parsed;
+        }
+      }
+      if (value is String && value.trim().isNotEmpty) {
+        return [value];
+      }
+    }
+    return fallback;
+  }
+
+  ProviderType _mapProviderType(String raw) {
+    switch (raw.toLowerCase()) {
+      case 'movie':
+      case 'movies':
+      case 'tvtype.movie':
+        return ProviderType.movie;
+      case 'tv':
+      case 'series':
+      case 'tvseries':
+      case 'tvshow':
+      case 'tvshows':
+      case 'tvtype.tvseries':
+        return ProviderType.series;
+      case 'anime':
+      case 'tvtype.anime':
+        return ProviderType.anime;
+      case 'livetv':
+      case 'iptv':
+      case 'tvtype.livetv':
+        return ProviderType.iptv;
+      default:
+        return ProviderType.other;
+    }
+  }
 
   @override
   Future<Map<String, List<MultimediaItem>>> getHome() async {

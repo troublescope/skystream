@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../../../core/config/tmdb_config.dart';
 import '../../../shared/widgets/cards_wrapper.dart';
 import '../../details/presentation/tmdb_movie_details_screen.dart';
 import '../../../../shared/widgets/shimmer_placeholder.dart';
@@ -138,10 +137,7 @@ class _ViewAllScreenState extends ConsumerState<ViewAllScreen> {
             }
 
             final item = state.items[index];
-            final posterPath = item.posterPath;
-            final imageUrl = posterPath != null
-                ? '${TmdbConfig.posterSizeUrl}$posterPath'
-                : 'https://via.placeholder.com/150x225';
+            final imageUrl = item.posterImageUrl;
             final itemTitle = item.title;
             final uniqueTag =
                 'view_all_${widget.category.name}_${item.id}_$index';

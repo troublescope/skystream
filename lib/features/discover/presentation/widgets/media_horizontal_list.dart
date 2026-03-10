@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../../../core/config/tmdb_config.dart';
 import '../../../../shared/widgets/cards_wrapper.dart';
 import '../../../details/presentation/tmdb_movie_details_screen.dart';
 import '../../../../shared/widgets/desktop_scroll_wrapper.dart'; // Import DesktopScrollWrapper
@@ -163,17 +162,7 @@ class _MediaHorizontalListState extends State<MediaHorizontalList> {
                   SizedBox(width: isDesktop ? 24 : 12),
               itemBuilder: (context, index) {
                 final item = widget.mediaList[index];
-                final posterPath = item.posterPath;
-                String imageUrl;
-                if (posterPath != null) {
-                  if (posterPath.startsWith('http')) {
-                    imageUrl = posterPath;
-                  } else {
-                    imageUrl = '${TmdbConfig.posterSizeUrl}$posterPath';
-                  }
-                } else {
-                  imageUrl = 'https://via.placeholder.com/150x225';
-                }
+                final imageUrl = item.posterImageUrl;
                 final itemTitle = item.title;
                 final prefix = widget.heroTagPrefix ?? 'list';
                 final uniqueTag =

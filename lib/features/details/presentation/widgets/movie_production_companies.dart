@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../../../core/config/tmdb_config.dart';
 import '../../../../shared/widgets/desktop_scroll_wrapper.dart';
 import '../../../../core/utils/responsive_breakpoints.dart';
 import '../../../../core/models/tmdb_details.dart';
@@ -93,45 +92,24 @@ class _MovieProductionCompaniesState extends State<MovieProductionCompanies> {
 
   Widget _buildDesktopItem(BuildContext context, int index) {
     final c = widget.productionCompanies[index];
-    final logo = c.logoPath;
-    if (logo != null) {
-      return Container(
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: CachedNetworkImage(
-          imageUrl: '${TmdbConfig.imageBaseUrl}$logo',
-          height: 20, // Reduced for TV
-          fit: BoxFit.contain,
-          placeholder: (_, _) => const SizedBox(width: 20, height: 20),
-          errorWidget: (_, _, _) => const Icon(Icons.error, size: 20),
-        ),
-      );
-    }
-    return Chip(
-      label: Text(c.name),
-      backgroundColor: widget.textSecondary?.withValues(alpha: 0.1),
-      labelStyle: TextStyle(color: widget.textColor, fontSize: 14),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: CachedNetworkImage(
+        imageUrl: c.logoImageUrl,
+        height: 20, // Reduced for TV
+        fit: BoxFit.contain,
+        placeholder: (_, _) => const SizedBox(width: 20, height: 20),
+        errorWidget: (_, _, _) => const Icon(Icons.error, size: 20),
+      ),
     );
   }
 
   Widget _buildMobileItem(BuildContext context, int index) {
     final company = widget.productionCompanies[index];
-    final logo = company.logoPath;
-    if (logo == null) {
-      return Container(
-        margin: const EdgeInsets.only(right: 16),
-        child: Chip(
-          label: Text(company.name),
-          backgroundColor: Theme.of(
-            context,
-          ).colorScheme.onSurface.withValues(alpha: 0.1),
-        ),
-      );
-    }
     return Container(
       margin: const EdgeInsets.only(right: 16),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -140,7 +118,7 @@ class _MovieProductionCompaniesState extends State<MovieProductionCompanies> {
         borderRadius: BorderRadius.circular(8),
       ),
       child: CachedNetworkImage(
-        imageUrl: '${TmdbConfig.imageBaseUrl}$logo',
+        imageUrl: company.logoImageUrl,
         fit: BoxFit.contain,
         width: 100,
         placeholder: (_, _) => const SizedBox.shrink(),

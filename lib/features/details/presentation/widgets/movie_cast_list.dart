@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../../../core/config/tmdb_config.dart';
 import '../../../../shared/widgets/cards_wrapper.dart';
 import '../../../../shared/widgets/desktop_scroll_wrapper.dart';
 import '../../../../core/utils/responsive_breakpoints.dart';
@@ -92,7 +91,6 @@ class _MovieCastListState extends State<MovieCastList> {
 
   Widget _buildDesktopItem(BuildContext context, int index) {
     final actor = widget.cast[index];
-    final p = actor.profilePath;
     return CardsWrapper(
       onTap: () {},
       borderRadius: BorderRadius.circular(40),
@@ -100,12 +98,7 @@ class _MovieCastListState extends State<MovieCastList> {
         children: [
           CircleAvatar(
             radius: 40,
-            backgroundImage: p != null
-                ? NetworkImage('${TmdbConfig.imageBaseUrl}$p')
-                : null,
-            child: p == null
-                ? const Icon(Icons.person, color: Colors.grey)
-                : null,
+            backgroundImage: NetworkImage(actor.profileImageUrl),
           ),
           const SizedBox(height: 8),
           SizedBox(
@@ -135,7 +128,6 @@ class _MovieCastListState extends State<MovieCastList> {
 
   Widget _buildMobileItem(BuildContext context, int index) {
     final member = widget.cast[index];
-    final profilePath = member.profilePath;
     return CardsWrapper(
       onTap: () {},
       borderRadius: BorderRadius.circular(8),
@@ -147,19 +139,9 @@ class _MovieCastListState extends State<MovieCastList> {
             CircleAvatar(
               radius: 35,
               backgroundColor: Colors.grey[800],
-              backgroundImage: profilePath != null
-                  ? CachedNetworkImageProvider(
-                      '${TmdbConfig.imageBaseUrl}$profilePath',
-                    )
-                  : null,
-              child: profilePath == null
-                  ? Text(
-                      member.name[0],
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                    )
-                  : null,
+              backgroundImage: CachedNetworkImageProvider(
+                member.profileImageUrl,
+              ),
             ),
             const SizedBox(height: 8),
             Text(

@@ -23,7 +23,8 @@ class StorageService {
   static const String kExtensionsBox = 'extension_data_box';
 
   Future<void> init() async {
-    await Hive.initFlutter();
+    final supportDir = await getApplicationSupportDirectory();
+    Hive.init(supportDir.path);
 
     _libraryBox = await _safeOpenBox(kLibraryBox);
     _settingsBox = await _safeOpenBox(kSettingsBox);

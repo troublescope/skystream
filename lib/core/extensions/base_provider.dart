@@ -7,7 +7,7 @@ abstract class SkyStreamProvider {
   String get name;
   String get mainUrl;
   String get version;
-  String get lang;
+  List<String> get languages;
   Set<ProviderType> get supportedTypes;
   bool get hasSearch => true;
   bool get isDebug => id.endsWith('.debug');

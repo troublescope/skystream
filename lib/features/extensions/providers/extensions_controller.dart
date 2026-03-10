@@ -192,6 +192,7 @@ class ExtensionsController extends Notifier<ExtensionsState> {
         await installPlugin(plugin);
         installedCount++;
       }
+      state = state.copyWith(availableUpdates: {});
     }
     return installedCount;
   }
@@ -358,6 +359,11 @@ class ExtensionsController extends Notifier<ExtensionsState> {
           plugin.repositoryId,
         );
         await loadInstalledPlugins();
+
+        // Clear this plugin from availableUpdates so the green Update button disappears
+        final newUpdates = Map<String, ExtensionPlugin>.from(state.availableUpdates)
+          ..remove(plugin.packageId);
+        state = state.copyWith(availableUpdates: newUpdates);
 
         if (await savedFile.exists()) {
           await savedFile.delete();
