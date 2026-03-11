@@ -12,6 +12,7 @@ class LocalProxyService {
   HttpServer? _server;
   int _serverPort = 0;
   final Map<String, String> _playlists = {};
+
   static const int _maxPlaylists = 50;
 
   int get port => _serverPort;

@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -349,15 +351,9 @@ class PlayerController extends Notifier<PlayerState> {
       );
 
       final headers = stream.headers ?? {};
-      await _applyPlaybackProperties(headers);
+      await _applyPlaybackProperties(headers, stream);
 
-      final extras = <String, String>{};
-      if (stream.drmKid != null && stream.drmKey != null) {
-        extras['demuxer-lavf-o'] =
-            'decryption_key=${stream.drmKid}:${stream.drmKey}';
-      }
-
-      await _player.open(Media(playUrl, httpHeaders: headers, extras: extras));
+      await _player.open(Media(playUrl, httpHeaders: headers));
 
       final historyList = ref.read(watchHistoryProvider);
       final savedPos = historyList
@@ -422,15 +418,9 @@ class PlayerController extends Notifier<PlayerState> {
       state = state.copyWith(streamSubtitle: "$pName - ${stream.quality}");
 
       final headers = stream.headers ?? {};
-      await _applyPlaybackProperties(headers);
+      await _applyPlaybackProperties(headers, stream);
 
-      final extras = <String, String>{};
-      if (stream.drmKid != null && stream.drmKey != null) {
-        extras['demuxer-lavf-o'] =
-            'decryption_key=${stream.drmKid}:${stream.drmKey}';
-      }
-
-      await _player.open(Media(playUrl, httpHeaders: headers, extras: extras));
+      await _player.open(Media(playUrl, httpHeaders: headers));
 
       if (oldPos > Duration.zero && !resetPosition) {
         await _safeSeekTo(oldPos.inMilliseconds);
@@ -490,7 +480,9 @@ class PlayerController extends Notifier<PlayerState> {
   Future<void> onTorrentFileSelected(int index) async {
     state = state.copyWith(isLoading: true);
     try {
-      final url = await ref.read(torrentServiceProvider).getStreamUrlForFileIndex(index);
+      final url = await ref
+          .read(torrentServiceProvider)
+          .getStreamUrlForFileIndex(index);
       if (url != null && state.currentStream != null) {
         String fileLabel = "Torrent File $index";
         try {
@@ -566,7 +558,9 @@ class PlayerController extends Notifier<PlayerState> {
       if (_isPolling) return;
       _isPolling = true;
       try {
-        final status = await ref.read(torrentServiceProvider).getCurrentStatus();
+        final status = await ref
+            .read(torrentServiceProvider)
+            .getCurrentStatus();
         if (status != null) {
           final urlToCheck = activeStreamUrl ?? state.currentStream?.url;
           if (urlToCheck?.contains("index=") ?? false) {
@@ -662,35 +656,148 @@ class PlayerController extends Notifier<PlayerState> {
         stream.url.endsWith(".torrent") ||
         (stream.url.startsWith("/") && stream.quality.contains("Torrent"))) {
       state = state.copyWith(streamSubtitle: "Initializing Torrent Engine...");
-      final torrentUrl = await ref.read(torrentServiceProvider).getStreamUrl(stream.url);
+      final torrentUrl = await ref
+          .read(torrentServiceProvider)
+          .getStreamUrl(stream.url);
       if (torrentUrl != null) return torrentUrl;
       return null;
     }
+
     return stream.url;
   }
 
-  Future<void> _applyPlaybackProperties(Map<String, String> headers) async {
-    if (_player.platform is! NativePlayer) return;
-    final native = _player.platform as NativePlayer;
+  /// Applies per-playback MPV properties (headers, cookies, DRM).
+  Future<void> _applyPlaybackProperties(
+    Map<String, String> headers,
+    StreamResult stream,
+  ) async {
+    // Debug: log what DRM fields the stream has so failures are traceable.
+    debugPrint(
+      '[DRM] stream drmKid=${stream.drmKid} '
+      'drmKey=${stream.drmKey} '
+      'licenseUrl=${stream.licenseUrl}',
+    );
 
-    final lowerHeaders = headers.map((k, v) => MapEntry(k.toLowerCase(), v));
+    if (_player.platform is NativePlayer) {
+      final native = _player.platform as NativePlayer;
 
-    if (lowerHeaders.containsKey('user-agent')) {
-      await native.setProperty('user-agent', lowerHeaders['user-agent']!);
-    }
-    if (lowerHeaders.containsKey('referer')) {
-      await native.setProperty('referrer', lowerHeaders['referer']!);
-    }
-    try {
-      final tempDir = await getTemporaryDirectory();
-      final cookieFile = File('${tempDir.path}/mpv_cookies.txt');
-      if (!await cookieFile.exists()) {
-        await cookieFile.create();
+      final lowerHeaders = headers.map((k, v) => MapEntry(k.toLowerCase(), v));
+
+      if (lowerHeaders.containsKey('user-agent')) {
+        await native.setProperty('user-agent', lowerHeaders['user-agent']!);
       }
-      await native.setProperty('cookies-file', cookieFile.path);
-      await native.setProperty('cookies-file-access', 'read+write');
+      if (lowerHeaders.containsKey('referer')) {
+        await native.setProperty('referrer', lowerHeaders['referer']!);
+      }
+
+      // 1. Performance tuning for network streams
+      // Fixes 1-2s stuttering by buffering ahead, but relies on default readahead logic
+      // so we don't accidentally stall HLS live streams that have short playlists.
+      await native.setProperty('cache', 'yes');
+      await native.setProperty('demuxer-max-bytes', '500MiB');
+      await native.setProperty('demuxer-max-back-bytes', '50MiB');
+      
+      // Target a safe 15 seconds of read-ahead buffer. 
+      // This is large enough to absorb 4K chunk download latency, but 
+      // strictly smaller than the typical 30-second HLS live edge so it doesn't stall.
+      await native.setProperty('demuxer-readahead-secs', '15');
+
+      // 2. Resolve ClearKey Hex Keys
+      String? keyHex = stream.drmKey;
+
+      if (keyHex == null && stream.licenseUrl != null) {
+        final extractedKeys = await _extractKeysFromLicenseUrl(
+          stream.licenseUrl!,
+          headers: stream.headers,
+        );
+        if (extractedKeys != null) {
+          keyHex = extractedKeys['key'];
+        }
+      }
+
+      if (keyHex != null) {
+        // FFmpeg's DASH demuxer natively expects cenc_decryption_key.
+        // It's usually the 32-character hex KEY.
+        debugPrint(
+          '[DRM] Injecting cenc_decryption_key via setProperty: $keyHex',
+        );
+        await native.setProperty(
+          'demuxer-lavf-o',
+          'cenc_decryption_key=$keyHex',
+        );
+      }
+
+      try {
+        final tempDir = await getTemporaryDirectory();
+        final cookieFile = File('${tempDir.path}/mpv_cookies.txt');
+        if (!await cookieFile.exists()) {
+          await cookieFile.create();
+        }
+        await native.setProperty('cookies-file', cookieFile.path);
+        await native.setProperty('cookies-file-access', 'read+write');
+      } catch (e) {
+        debugPrint('Failed to set cookies-file: $e');
+      }
+    }
+  }
+
+  /// Fetches a ClearKey license from [licenseUrl] and returns the FIRST
+  /// kid and key found as a map: {'kid': '...', 'key': '...'} in hex format.
+  /// If the response is not parseable, returns null.
+  Future<Map<String, String>?> _extractKeysFromLicenseUrl(
+    String licenseUrl, {
+    Map<String, String>? headers,
+  }) async {
+    try {
+      debugPrint('[DRM] Fetching ClearKey license from $licenseUrl');
+      final response = await http.get(Uri.parse(licenseUrl), headers: headers);
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        debugPrint('[DRM] License server returned ${response.statusCode}');
+        return null;
+      }
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      final keys = body['keys'] as List<dynamic>?;
+      if (keys == null || keys.isEmpty) {
+        debugPrint('[DRM] No keys array in license response');
+        return null;
+      }
+
+      // MPV's libdash only supports a single kid:key pair reliably via Laurl redirect.
+      for (final entry in keys) {
+        final kid = entry['kid'] as String?;
+        final k = entry['k'] as String?;
+        if (kid == null || k == null) continue;
+
+        // Base64url → hex conversion.
+        final kidHex = _base64UrlToHex(kid);
+        final keyHex = _base64UrlToHex(k);
+        if (kidHex != null && keyHex != null) {
+          return {'kid': kidHex, 'key': keyHex};
+        }
+      }
+
+      return null;
     } catch (e) {
-      debugPrint("Failed to set cookies-file: $e");
+      debugPrint('[DRM] Error fetching/parsing license: $e');
+      return null;
+    }
+  }
+
+  /// Converts a Base64url-encoded string to a lowercase hex string.
+  String? _base64UrlToHex(String base64url) {
+    try {
+      // Add padding if needed.
+      String padded = base64url;
+      final rem = padded.length % 4;
+      if (rem == 2) padded += '==';
+      if (rem == 3) padded += '=';
+      final bytes = base64Url.decode(padded);
+      return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    } catch (e) {
+      debugPrint('[DRM] base64url decode failed for "$base64url": $e');
+      return null;
     }
   }
 
