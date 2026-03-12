@@ -32,6 +32,12 @@ class SettingsRepository {
     return _storageService.getActiveProviderId();
   }
 
+  Future<void> setCustomBaseUrl(String packageName, String? url) =>
+      _storageService.setCustomBaseUrl(packageName, url);
+
+  String? getCustomBaseUrl(String packageName) =>
+      _storageService.getCustomBaseUrl(packageName);
+
   Future<void> setLanguage(String lang) async {
     await _storageService.setLanguage(lang);
   }

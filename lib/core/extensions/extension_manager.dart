@@ -110,6 +110,17 @@ class ExtensionManager extends Notifier<List<SkyStreamProvider>> {
     }
   }
 
+  Future<void> updateCustomBaseUrl(String packageName, String? url) async {
+    final settings = ref.read(settingsRepositoryProvider);
+    await settings.setCustomBaseUrl(packageName, url);
+
+    // Reload the provider to apply changes
+    final currentProvider = getProvider(packageName);
+    if (currentProvider != null) {
+      debugPrint("ExtensionManager: Custom base URL updated for $packageName. Reload recommended.");
+    }
+  }
+
   Future<SkyStreamProvider?> _loadPlugin(
     ExtensionPlugin plugin, {
     bool addToState = true,
@@ -129,12 +140,16 @@ class ExtensionManager extends Notifier<List<SkyStreamProvider>> {
       // Derive namespace from ID to ensure uniqueness
       final namespace = plugin.packageName.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
 
+      final settings = ref.read(settingsRepositoryProvider);
+      final customBaseUrl = settings.getCustomBaseUrl(plugin.packageName);
+
       final provider = JsBasedProvider(
         _engine!,
         path,
         packageName: plugin.packageName,
         namespace: namespace,
-        manifest: plugin.manifest, // Pass pre-parsed manifest
+        manifest: plugin.manifest,
+        customBaseUrl: customBaseUrl,
       );
 
       debugPrint("ExtensionManager: Waiting for init of $namespace");

@@ -14,6 +14,7 @@ class ExtensionPlugin {
   final int? fileSize; // In bytes
   final int status; // 0: Down, 1: Ok, 2: Slow, 3: Beta
   final Map<String, dynamic> manifest; // Raw JSON manifest
+  final String? customBaseUrl; // User-defined override for baseUrl
 
   ExtensionPlugin({
     required this.packageName,
@@ -29,6 +30,7 @@ class ExtensionPlugin {
     this.languages = const [],
     this.fileSize,
     this.manifest = const {},
+    this.customBaseUrl,
   });
 
   /// Helper to check if this is a debug/asset plugin
@@ -80,6 +82,26 @@ class ExtensionPlugin {
       languages: _readList(json, ['languages', 'language', 'lang']),
       fileSize: json['fileSize'] as int?,
       manifest: json,
+      customBaseUrl: json['customBaseUrl'] as String?,
+    );
+  }
+
+  ExtensionPlugin copyWith({String? customBaseUrl}) {
+    return ExtensionPlugin(
+      packageName: packageName,
+      name: name,
+      repositoryId: repositoryId,
+      sourceUrl: sourceUrl,
+      version: version,
+      status: status,
+      iconUrl: iconUrl,
+      authors: authors,
+      description: description,
+      categories: categories,
+      languages: languages,
+      fileSize: fileSize,
+      manifest: manifest,
+      customBaseUrl: customBaseUrl ?? this.customBaseUrl,
     );
   }
 }

@@ -144,6 +144,21 @@ class StorageService {
     return _extensionsBox.get(key) as String?;
   }
 
+  // --- Custom Plugin Overrides ---
+
+  Future<void> setCustomBaseUrl(String packageName, String? url) async {
+    final key = 'custom_base_url_$packageName';
+    if (url == null) {
+      await _settingsBox.delete(key);
+    } else {
+      await _settingsBox.put(key, url);
+    }
+  }
+
+  String? getCustomBaseUrl(String packageName) {
+    return _settingsBox.get('custom_base_url_$packageName') as String?;
+  }
+
   // --- Language ---
   Future<void> setLanguage(String lang) async {
     await _settingsBox.put('language', lang);

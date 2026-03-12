@@ -23,6 +23,7 @@ class JsBasedProvider extends SkyStreamProvider {
 
   late Future<void> _initFuture;
   final Map<String, dynamic>? _initialManifest;
+  final String? _customBaseUrl;
 
   // Update constructor
   JsBasedProvider(
@@ -32,10 +33,12 @@ class JsBasedProvider extends SkyStreamProvider {
     String? namespace,
     String? forcedName,
     Map<String, dynamic>? manifest,
+    String? customBaseUrl,
   }) : _packageName = packageName,
        _namespace = namespace,
        _forcedName = forcedName,
-       _initialManifest = manifest {
+       _initialManifest = manifest,
+       _customBaseUrl = customBaseUrl {
     _initFuture = _init();
   }
 
@@ -63,7 +66,10 @@ class JsBasedProvider extends SkyStreamProvider {
     if (script != null) {
       // 1. Ensure manifest is populated BEFORE evaluation
       if (_initialManifest != null && _initialManifest!.isNotEmpty) {
-        _manifest = _initialManifest!;
+        _manifest = Map<String, dynamic>.from(_initialManifest!);
+        if (_customBaseUrl != null && _customBaseUrl!.isNotEmpty) {
+          _manifest['baseUrl'] = _customBaseUrl;
+        }
       }
 
       final manifestJson = jsonEncode(_manifest);
@@ -121,7 +127,7 @@ class JsBasedProvider extends SkyStreamProvider {
 
   // ... (rest of simple getters)
   @override
-  String get mainUrl => _manifest['baseUrl'] ?? "";
+  String get mainUrl => _customBaseUrl ?? _manifest['baseUrl'] ?? "";
 
   @override
   String get version => (_manifest['version'] ?? 0).toString();
