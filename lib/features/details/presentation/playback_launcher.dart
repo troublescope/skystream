@@ -80,7 +80,7 @@ class PlaybackLauncher {
         try {
           final val = item.provider!;
           provider = manager.getAllProviders().firstWhere(
-            (p) => p.id == val || p.name == val,
+            (p) => p.packageName == val || p.name == val,
           );
         } catch (e) {
           debugPrint('PlaybackLauncher.launch: $e');

@@ -168,7 +168,7 @@ class _SearchResultSectionState extends ConsumerState<SearchResultSection> {
     try {
       final manager = ref.read(extensionManagerProvider.notifier);
       final p = manager.getAllProviders().firstWhere(
-        (p) => p.id == widget.providerId,
+        (p) => p.packageName == widget.providerId,
       );
       if (p.isDebug) {
         isDebug = true;

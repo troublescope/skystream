@@ -34,7 +34,7 @@ class ContinueWatchingCard extends ConsumerWidget {
     // Resolve Provider Name
     final providers = ref.watch(extensionManagerProvider);
     final providerObj = (item.provider != null)
-        ? providers.where((p) => p.id == item.provider).firstOrNull
+        ? providers.where((p) => p.packageName == item.provider).firstOrNull
         : null;
     final providerName = providerObj?.name ?? item.provider;
 

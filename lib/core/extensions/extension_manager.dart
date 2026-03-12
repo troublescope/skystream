@@ -36,14 +36,14 @@ class ExtensionManager extends Notifier<List<SkyStreamProvider>> {
     debugPrint("ExtensionManager: Syncing ${installed.length} plugin");
     if (_engine == null || _storageService == null) return;
 
-    final activeId = ref.read(settingsRepositoryProvider).getActiveProviderId();
+    final activePackageName = ref.read(settingsRepositoryProvider).getActiveProviderId();
 
     // Sort plugins: Active first
     final sortedPlugins = List<ExtensionPlugin>.from(installed);
-    if (activeId != null) {
+    if (activePackageName != null) {
       sortedPlugins.sort((a, b) {
-        if (a.id == activeId) return -1;
-        if (b.id == activeId) return 1;
+        if (a.packageName == activePackageName) return -1;
+        if (b.packageName == activePackageName) return 1;
         return 0;
       });
     }
@@ -52,7 +52,7 @@ class ExtensionManager extends Notifier<List<SkyStreamProvider>> {
     final newProviders = <SkyStreamProvider>[];
 
     for (final plugin in sortedPlugins) {
-      final existingList = state.where((p) => p.id == plugin.id);
+      final existingList = state.where((p) => p.packageName == plugin.packageName);
       final existing = existingList.isNotEmpty ? existingList.first : null;
 
       bool needsLoad = existing == null;
@@ -61,13 +61,13 @@ class ExtensionManager extends Notifier<List<SkyStreamProvider>> {
         final oldVersion = existing.version;
         if (newVersion != oldVersion) {
           // Version changed, reload
-          state = state.where((p) => p.id != plugin.id).toList();
+          state = state.where((p) => p.packageName != plugin.packageName).toList();
           needsLoad = true;
         }
       }
 
       if (needsLoad) {
-        if (plugin.id == activeId) {
+        if (plugin.packageName == activePackageName) {
           await _loadPlugin(plugin, addToState: true);
         } else {
           // Stagger loading slightly to not freeze UI
@@ -83,12 +83,12 @@ class ExtensionManager extends Notifier<List<SkyStreamProvider>> {
     }
 
     // Unload Removed Plugins
-    final installedIds = installed.map((e) => e.id).toSet();
+    final installedPackageNames = installed.map((e) => e.packageName).toSet();
 
     final providersToRemove = <SkyStreamProvider>[];
 
     for (final provider in state) {
-      if (!installedIds.contains(provider.id)) {
+      if (!installedPackageNames.contains(provider.packageName)) {
         providersToRemove.add(provider);
       }
     }
@@ -99,7 +99,7 @@ class ExtensionManager extends Notifier<List<SkyStreamProvider>> {
       );
       final newState = List<SkyStreamProvider>.from(state);
       for (final p in providersToRemove) {
-        debugPrint("ExtensionManager: Removing ${p.id} (${p.name})");
+        debugPrint("ExtensionManager: Removing ${p.packageName} (${p.name})");
         newState.remove(p);
         // Also cleanup JS resources if needed
         if (p is JsBasedProvider) {
@@ -126,20 +126,20 @@ class ExtensionManager extends Notifier<List<SkyStreamProvider>> {
         }
       }
 
-      // Derive namespace from ID to ensure uniqueness (internalName might be missing/default)
-      final namespace = plugin.id.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
+      // Derive namespace from ID to ensure uniqueness
+      final namespace = plugin.packageName.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
 
       final provider = JsBasedProvider(
         _engine!,
         path,
-        id: plugin.id,
+        packageName: plugin.packageName,
         namespace: namespace,
         manifest: plugin.manifest, // Pass pre-parsed manifest
       );
 
       debugPrint("ExtensionManager: Waiting for init of $namespace");
       await provider.waitForInit;
-      debugPrint("ExtensionManager: Init complete for ${plugin.id}");
+      debugPrint("ExtensionManager: Init complete for ${plugin.packageName}");
 
       if (addToState) {
         _addProvider(provider);
@@ -152,22 +152,22 @@ class ExtensionManager extends Notifier<List<SkyStreamProvider>> {
   }
 
   void _addProvider(SkyStreamProvider provider) {
-    // Deduplicate by ID
-    if (!state.any((p) => p.id == provider.id)) {
+    // Deduplicate by Package Name
+    if (!state.any((p) => p.packageName == provider.packageName)) {
       debugPrint(
-        "ExtensionManager: Adding provider to state: ${provider.name} (${provider.id})",
+        "ExtensionManager: Adding provider to state: ${provider.name} (${provider.packageName})",
       );
       state = [...state, provider];
     } else {
-      debugPrint("ExtensionManager: Provider ${provider.id} already in state.");
+      debugPrint("ExtensionManager: Provider ${provider.packageName} already in state.");
     }
   }
 
   List<SkyStreamProvider> getAllProviders() => state;
 
-  SkyStreamProvider? getProvider(String id) {
+  SkyStreamProvider? getProvider(String packageName) {
     try {
-      return state.firstWhere((p) => p.id == id);
+      return state.firstWhere((p) => p.packageName == packageName);
     } catch (_) {
       return null;
     }
@@ -220,15 +220,15 @@ class ActiveProviderNotifier extends Notifier<SkyStreamProvider?> {
           ref.read(providerResolutionLoadingProvider.notifier).set(false);
         }
       } else if (state != null) {
-        final currentId = state!.id;
-        final found = next.where((p) => p.id == currentId);
+        final currentPackageName = state!.packageName;
+        final found = next.where((p) => p.packageName == currentPackageName);
 
         if (found.isEmpty) {
           debugPrint(
             "ActiveProviderNotifier: Active provider removed, waiting for reload...",
           );
           state = null;
-          _targetProviderId = currentId;
+          _targetProviderId = currentPackageName;
           ref.read(providerResolutionLoadingProvider.notifier).set(true);
         } else {
           final match = found.first;
@@ -241,8 +241,6 @@ class ActiveProviderNotifier extends Notifier<SkyStreamProvider?> {
 
     return null;
   }
-
-
 
   void _loadFromStorage(List<SkyStreamProvider> currentProviders) {
     final storage = ref.read(settingsRepositoryProvider);
@@ -269,6 +267,6 @@ class ActiveProviderNotifier extends Notifier<SkyStreamProvider?> {
     ref.read(providerResolutionLoadingProvider.notifier).set(false);
 
     final storage = ref.read(settingsRepositoryProvider);
-    await storage.setActiveProviderId(provider?.id);
+    await storage.setActiveProviderId(provider?.packageName);
   }
 }

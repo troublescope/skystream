@@ -26,12 +26,12 @@ class ExtensionRepository {
   }) : _explicitId = explicitId;
 
   /// The Package Namespace.
-  /// Returns explicit ID (e.g. "com.hexated") or falls back to Hash(Url).
-  String get id => _explicitId ?? sha256.convert(utf8.encode(url)).toString().substring(0, 10);
+  /// Returns explicit Package Name or falls back to Hash(Url).
+  String get packageName => _explicitId ?? sha256.convert(utf8.encode(url)).toString().substring(0, 10);
 
   /// Factory constructor to parse from JSON
   factory ExtensionRepository.fromJson(Map<String, dynamic> json, String url) {
-    final repoId = json['id'] as String? ?? 'Unknown';
+    final repoId = json['packageName'] as String? ?? 'Unknown';
     return ExtensionRepository(
       name: json['name'] as String? ?? 'Unknown Repository',
       url: url,
@@ -43,7 +43,7 @@ class ExtensionRepository {
       description: json['description'] as String?,
       iconUrl: json['iconUrl'] as String?,
       manifestVersion: json['manifestVersion'] as int? ?? 1,
-      explicitId: json['id'] as String?,
+      explicitId: json['packageName'] as String?,
     );
   }
 }

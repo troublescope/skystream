@@ -362,7 +362,7 @@ class DetailsProviderChip extends ConsumerWidget {
     try {
       final manager = ref.read(extensionManagerProvider.notifier);
       final p = manager.getAllProviders().firstWhere(
-        (p) => p.id == providerName || p.name == providerName,
+        (p) => p.packageName == providerName || p.name == providerName,
       );
       displayName = p.name;
       if (p.isDebug) {

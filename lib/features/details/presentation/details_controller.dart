@@ -112,7 +112,7 @@ class DetailsController extends Notifier<DetailsState> {
       if (item.provider != null) {
         try {
           provider = manager.getAllProviders().firstWhere(
-            (p) => p.id == item.provider || p.name == item.provider,
+            (p) => p.packageName == item.provider || p.name == item.provider,
           );
         } catch (e) {
           debugPrint('DetailsController.loadDetails: $e');
@@ -123,7 +123,7 @@ class DetailsController extends Notifier<DetailsState> {
 
       if (provider != null) {
         final fetchedItem = await provider.getDetails(item.url);
-        final withProvider = fetchedItem.copyWith(provider: provider.id);
+        final withProvider = fetchedItem.copyWith(provider: provider.packageName);
 
         _processEpisodes(withProvider.episodes, withProvider);
         state = state.copyWith(details: AsyncData(withProvider));

@@ -286,7 +286,7 @@ class PlayerController extends Notifier<PlayerState> {
       try {
         final val = _item.provider!;
         return manager.getAllProviders().firstWhere(
-          (p) => p.id == val || p.name == val,
+          (p) => p.packageName == val || p.name == val,
         );
       } catch (e) {
         debugPrint('PlayerController._resolveProvider: $e');
@@ -535,7 +535,7 @@ class PlayerController extends Notifier<PlayerState> {
       if (progress > 1 || isSeries) {
         final pId =
             _item.provider ??
-            ref.read(activeProviderStateProvider)?.id ??
+            ref.read(activeProviderStateProvider)?.packageName ??
             'Unknown';
         final itemToSave = _item.copyWith(provider: pId);
         historyNotifier.saveProgress(
@@ -641,7 +641,7 @@ class PlayerController extends Notifier<PlayerState> {
     try {
       final manager = ref.read(extensionManagerProvider.notifier);
       final p = manager.getAllProviders().firstWhere(
-        (p) => p.id == providerName || p.name == providerName,
+        (p) => p.packageName == providerName || p.name == providerName,
       );
       if (p.isDebug) return "${p.name} [DEBUG]";
       return p.name;

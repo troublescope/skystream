@@ -12,10 +12,10 @@ class JsBasedProvider extends SkyStreamProvider {
   final JsEngineService _jsEngine;
   final String _scriptPath;
   String get scriptPath => _scriptPath;
-  // Include ID
-  final String _id;
+  // Unique package identifier
+  final String _packageName;
   @override
-  String get id => _id;
+  String get packageName => _packageName;
 
   final String? _namespace;
   String? get namespace => _namespace; // Expose namespace
@@ -28,11 +28,11 @@ class JsBasedProvider extends SkyStreamProvider {
   JsBasedProvider(
     this._jsEngine,
     this._scriptPath, {
-    required String id,
+    required String packageName,
     String? namespace,
     String? forcedName,
     Map<String, dynamic>? manifest,
-  }) : _id = id,
+  }) : _packageName = packageName,
        _namespace = namespace,
        _forcedName = forcedName,
        _initialManifest = manifest {
@@ -99,10 +99,10 @@ class JsBasedProvider extends SkyStreamProvider {
 
       try {
         await _jsEngine.loadScript(script);
-        debugPrint("JsBasedProvider: Loaded namespaced script for $_id");
+        debugPrint("JsBasedProvider: Loaded namespaced script for $_packageName");
       } catch (e) {
         _error = "Eval: $e";
-        debugPrint("JsBasedProvider: CRITICAL - Eval failed for $_id: $e");
+        debugPrint("JsBasedProvider: CRITICAL - Eval failed for $_packageName: $e");
       }
     } else {
       _error = "Not found";

@@ -1,7 +1,6 @@
 class ExtensionPlugin {
-  final String id; // Unique Plugin ID (e.g. "com.hexated.superstream")
+  final String packageName; // Unique Plugin ID (e.g. "com.hexated.superstream")
   final String name; // Display Name (e.g. "SuperStream")
-  final String internalName; // Internal Class Name (e.g. "SuperStream")
   final String repositoryId; // "com.hexated" or "LocalAssets"
   final String sourceUrl; // Download Link or Local Path
   final int version;
@@ -17,9 +16,8 @@ class ExtensionPlugin {
   final Map<String, dynamic> manifest; // Raw JSON manifest
 
   ExtensionPlugin({
-    required this.id,
+    required this.packageName,
     required this.name,
-    required this.internalName,
     required this.repositoryId,
     required this.sourceUrl,
     required this.version,
@@ -33,16 +31,12 @@ class ExtensionPlugin {
     this.manifest = const {},
   });
 
-  /// The Globally Unique ID
-  String get packageId => id;
-
   /// Helper to check if this is a debug/asset plugin
-  bool get isDebug => id.endsWith('.debug');
+  bool get isDebug => packageName.endsWith('.debug');
 
   /// Local File Path relative to plugin root
-  /// e.g. "plugin/[id]/plugin.js"
-  /// Updated to use ID as directory name for uniqueness
-  String get filePath => "$repositoryId/$id/plugin.js";
+  /// e.g. "plugin/[packageName]/plugin.js"
+  String get filePath => "$repositoryId/$packageName/plugin.js";
 
   static List<String> _readList(Map<String, dynamic> json, List<String> keys) {
     for (final key in keys) {
@@ -62,13 +56,15 @@ class ExtensionPlugin {
     Map<String, dynamic> json,
     String repositoryId,
   ) {
-    final internal = json['internalName'] as String? ?? json['name']?.toString().toUpperCase().replaceAll(RegExp(r'\s+'), '') ?? 'UNKNOWN';
-    final fallbackId = "$repositoryId.${internal.toLowerCase()}";
+    final String? packageName = json['packageName'] as String?;
+
+    if (packageName == null) {
+      throw Exception('Plugin manifest missing mandatory "packageName" field');
+    }
 
     return ExtensionPlugin(
-      id: (json['id'] as String?) ?? (json['package-name'] as String?) ?? fallbackId,
+      packageName: packageName,
       name: json['name'] as String? ?? 'Unknown Plugin',
-      internalName: internal,
       repositoryId: repositoryId,
       sourceUrl: json['url'] as String? ?? '',
       version: json['version'] as int? ?? 1,

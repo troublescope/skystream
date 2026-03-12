@@ -404,7 +404,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     int selectedIndex = 0; // 0 is "None"
     if (activeProvider != null) {
       for (int i = 0; i < providers.length; i++) {
-        if (providers[i].id == activeProvider.id) {
+        if (providers[i].packageName == activeProvider.packageName) {
           selectedIndex = i + 1; // +1 because "None" is at index 0
           break;
         }
@@ -439,12 +439,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               maxHeight: MediaQuery.sizeOf(context).height * 0.6,
             ),
             child: RadioGroup<String?>(
-              groupValue: activeProvider?.id,
+              groupValue: activeProvider?.packageName,
               onChanged: (val) {
                 if (val == null) {
                   ref.read(activeProviderStateProvider.notifier).set(null);
                 } else {
-                  final selected = providers.firstWhere((p) => p.id == val);
+                  final selected = providers.firstWhere((p) => p.packageName == val);
                   ref.read(activeProviderStateProvider.notifier).set(selected);
                 }
                 Navigator.pop(context);
@@ -495,7 +495,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                           ],
                         ],
                       ),
-                      value: p.id,
+                      value: p.packageName,
                     );
                   },
                 ),

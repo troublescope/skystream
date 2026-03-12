@@ -70,17 +70,43 @@ class ExtensionsController extends Notifier<ExtensionsState> {
   }
 
   Future<void> _init() async {
-    await loadInstalledPlugins();
-    await _loadPersistedRepositories();
-  }
+    state = state.copyWith(isLoading: true);
+    try {
+      // 1. Load Installed Plugins
+      var plugins = await _storageService.listInstalledPlugins();
+      if (ref.read(settingsRepositoryProvider).getDevLoadAssets()) {
+        final assetPlugins = await _loadAssetPlugins();
+        plugins.addAll(assetPlugins);
+      }
 
-  Future<void> _loadPersistedRepositories() async {
-    final prefs = await SharedPreferences.getInstance();
-    final urls = prefs.getStringList('extension_repo_urls') ?? [];
+      // 2. Load Repositories
+      final prefs = await SharedPreferences.getInstance();
+      final urls = prefs.getStringList('extension_repo_urls') ?? [];
+      
+      final repos = <ExtensionRepository>[];
+      final available = <String, List<ExtensionPlugin>>{};
 
-    for (final url in urls) {
-      // Use visitedUrls empty set for each initial load to ensure isolation
-      await addRepository(url);
+      for (final url in urls) {
+        try {
+          final repo = await _repositoryService.fetchRepository(url);
+          if (repo != null) {
+            repos.add(repo);
+            available[repo.url] = await _repositoryService.getRepoPlugins(repo);
+          }
+        } catch (e) {
+          debugPrint("Failed to load persisted repo $url: $e");
+        }
+      }
+
+      // 3. Set Final State Once
+      state = state.copyWith(
+        installedPlugins: plugins,
+        repositories: repos,
+        availablePlugins: available,
+        isLoading: false,
+      );
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
@@ -141,16 +167,16 @@ class ExtensionsController extends Notifier<ExtensionsState> {
     try {
       final json = Map<String, dynamic>.from(jsonDecode(content));
 
-      // Ensure ID exists
-      if (json['id'] == null) {
-        json['id'] = "local.asset.${jsFilePath.split('/').last}";
+      // Ensure Unique Package Name exists
+      if (json['packageName'] == null && json['id'] == null) {
+        json['packageName'] = "local.asset.${jsFilePath.split('/').last}";
       }
 
       // Apply .debug suffix for asset plugins for identification
       if (jsFilePath.startsWith('assets/')) {
-        final String originalId = json['id'].toString();
-        if (!originalId.endsWith('.debug')) {
-          json['id'] = "$originalId.debug";
+        final String currentPkg = (json['packageName'] ?? json['id']).toString();
+        if (!currentPkg.endsWith('.debug')) {
+          json['packageName'] = "$currentPkg.debug";
         }
       }
 
@@ -170,15 +196,15 @@ class ExtensionsController extends Notifier<ExtensionsState> {
 
     for (final list in state.availablePlugins.values) {
       for (final plugin in list) {
-        onlineMap[plugin.packageId] = plugin;
+        onlineMap[plugin.packageName] = plugin;
       }
     }
 
     for (final installed in state.installedPlugins) {
-      final online = onlineMap[installed.packageId];
+      final online = onlineMap[installed.packageName];
       if (online != null) {
         if (online.version > installed.version) {
-          updates[installed.packageId] = online;
+          updates[installed.packageName] = online;
         }
       }
     }
@@ -305,9 +331,7 @@ class ExtensionsController extends Notifier<ExtensionsState> {
         final match = state.installedPlugins
             .cast<ExtensionPlugin?>()
             .firstWhere(
-              (p) =>
-                  p?.packageId == repoPlugin.packageId ||
-                  p?.internalName == repoPlugin.internalName,
+              (p) => p?.packageName == repoPlugin.packageName,
               orElse: () => null,
             );
         if (match != null) {
@@ -317,13 +341,13 @@ class ExtensionsController extends Notifier<ExtensionsState> {
 
       // Also try strict ID match just in case
       final strictMatches = state.installedPlugins.where(
-        (p) => p.repositoryId == repoToRemove.id,
+        (p) => p.repositoryId == repoToRemove.packageName,
       );
       for (final p in strictMatches) {
         if (!pluginsToDelete.contains(p)) {
-          // check equality by reference or ID
+          // check equality by reference or Package Name
           if (!pluginsToDelete.any(
-            (existing) => existing.packageId == p.packageId,
+            (existing) => existing.packageName == p.packageName,
           )) {
             pluginsToDelete.add(p);
           }
@@ -335,9 +359,8 @@ class ExtensionsController extends Notifier<ExtensionsState> {
       }
 
       // Final State Update to remove deleted plugin from 'installed' list
-      // We essentially just filter the CURRENT state's installed list
       final newInstalled = state.installedPlugins
-          .where((p) => !pluginsToDelete.any((d) => d.packageId == p.packageId))
+          .where((p) => !pluginsToDelete.any((d) => d.packageName == p.packageName))
           .toList();
       state = state.copyWith(installedPlugins: newInstalled);
     } catch (e) {
@@ -362,7 +385,7 @@ class ExtensionsController extends Notifier<ExtensionsState> {
 
         // Clear this plugin from availableUpdates so the green Update button disappears
         final newUpdates = Map<String, ExtensionPlugin>.from(state.availableUpdates)
-          ..remove(plugin.packageId);
+          ..remove(plugin.packageName);
         state = state.copyWith(availableUpdates: newUpdates);
 
         if (await savedFile.exists()) {

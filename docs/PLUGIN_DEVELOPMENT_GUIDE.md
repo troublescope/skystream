@@ -88,8 +88,8 @@ Create a JSON file that lists the actual plugins.
 ```json
 [
   {
+    "packageName": "com.myname.myprovider",
     "name": "My Provider",
-    "internalName": "MyProvider",
     "url": "https://example.com/repo/MyProvider.sky",
     "icon": "https://example.com/repo/icon.png",
     "version": 1,
@@ -108,7 +108,7 @@ SkyStream requires a "Repository Manifest" as the entry point. This file points 
 ```json
 {
   "name": "My Awesome Repository",
-  "id": "com.myname.repo",
+  "packageName": "com.myname.repo",
   "description": "A collection of my custom plugins",
   "manifestVersion": 1,
   "pluginLists": [

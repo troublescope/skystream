@@ -73,7 +73,7 @@ class RepositoryService {
         if (data != null) {
           // Validation: A valid repository must have a name, an ID, and either pluginLists or repos
           final hasName = data.containsKey('name');
-          final hasId = data.containsKey('id');
+          final hasId = data.containsKey('id') || data.containsKey('packageName');
           // Extract lists safely to check content
           final plugins = (data['pluginLists'] as List?) ?? [];
           final repos = (data['repos'] as List?) ?? [];
@@ -82,7 +82,7 @@ class RepositoryService {
           final hasRepos = repos.isNotEmpty;
 
           if (!hasName || !hasId || (!hasPlugins && !hasRepos)) {
-             throw Exception('Invalid repository format: Missing name, id, or plugin/repos');
+             throw Exception('Invalid repository format: Missing name, id/packageName, or plugin/repos');
           }
           
           if (hasPlugins && hasRepos) {
@@ -119,7 +119,7 @@ class RepositoryService {
               : response.data as List<dynamic>?;
 
            if (list != null) {
-             final plugins = list.map((e) => ExtensionPlugin.fromJson(e, repo.id)).toList();
+             final plugins = list.map((e) => ExtensionPlugin.fromJson(e, repo.packageName)).toList();
              allPlugins.addAll(plugins);
            }
         }

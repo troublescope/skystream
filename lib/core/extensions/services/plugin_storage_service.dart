@@ -49,9 +49,9 @@ class PluginStorageService {
       throw Exception("Failed to parse plugin.json: $e");
     }
 
-    // Ensure ID exists
-    if (manifestMap['id'] == null) {
-      throw Exception("Plugin Manifest (plugin.json) missing 'id'");
+    // Ensure Unique Package Name exists (New Standard)
+    if (manifestMap['packageName'] == null && manifestMap['id'] == null) {
+      throw Exception("Plugin Manifest (plugin.json) missing 'packageName'");
     }
 
     // Create ExtensionPlugin Object
@@ -64,9 +64,9 @@ class PluginStorageService {
       explicitRepoId ?? 'UnknownRepo',
     );
 
-    // Create Target Directory: plugin/[ID]/
+    // Create Target Directory: plugin/[packageName]/
     final rootDir = await _pluginsDir;
-    final targetDir = Directory(p.join(rootDir.path, plugin.id));
+    final targetDir = Directory(p.join(rootDir.path, plugin.packageName));
 
     debugPrint("PluginStorageService: Extracting to ${targetDir.path}");
 
@@ -95,16 +95,14 @@ class PluginStorageService {
     metaData['repositoryId'] = explicitRepoId; // cache source repo
     await metaFile.writeAsString(jsonEncode(metaData));
 
-    debugPrint("PluginStorageService: Installation complete for ${plugin.id}");
+    debugPrint("PluginStorageService: Installation complete for ${plugin.packageName}");
     return plugin;
   }
 
-  /// Deletes a plugin directory (by ID now)
+  /// Deletes a plugin directory (by Package Name)
   Future<void> deletePlugin(ExtensionPlugin plugin) async {
     final rootDir = await _pluginsDir;
-    // Old: plugin/[Repo]/[Internal] - Removed
-    // New: plugin/[ID]
-    final pluginDir = Directory(p.join(rootDir.path, plugin.id));
+    final pluginDir = Directory(p.join(rootDir.path, plugin.packageName));
     if (await pluginDir.exists()) {
       await pluginDir.delete(recursive: true);
     }
@@ -172,8 +170,8 @@ class PluginStorageService {
     }
 
     final rootDir = await _pluginsDir;
-    // New Path: plugin/[ID]/plugin.js
-    final jsFile = File(p.join(rootDir.path, plugin.id, 'plugin.js'));
+    // New Path: plugin/[packageName]/plugin.js
+    final jsFile = File(p.join(rootDir.path, plugin.packageName, 'plugin.js'));
     return jsFile.path;
   }
 

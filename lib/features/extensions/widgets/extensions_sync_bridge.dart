@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/extensions/extension_manager.dart';
@@ -13,9 +14,11 @@ class ExtensionsSyncBridge extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.listen(extensionsControllerProvider, (previous, next) {
-      ref
-          .read(extensionManagerProvider.notifier)
-          .syncFromPlugins(next.installedPlugins);
+      if (!listEquals(previous?.installedPlugins, next.installedPlugins)) {
+        ref
+            .read(extensionManagerProvider.notifier)
+            .syncFromPlugins(next.installedPlugins);
+      }
     });
     return child;
   }

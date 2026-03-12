@@ -424,7 +424,7 @@ class _PluginTile extends ConsumerWidget {
 
     final state = ref.watch(extensionsControllerProvider);
 
-    // Find if installed (STRICT ID match, ignoring debug versions)
+    // Find if installed (STRICT Package Name match, ignoring debug versions)
     // We explicitly exclude any installed plugin that ends with .debug matching this online plugin
     final installedPlugin = state.installedPlugins
         .cast<ExtensionPlugin?>()
@@ -435,12 +435,11 @@ class _PluginTile extends ConsumerWidget {
             return false;
           }
 
-          return p.packageId == plugin.packageId ||
-              p.internalName == plugin.internalName;
+          return p.packageName == plugin.packageName;
         }, orElse: () => null);
 
     final isInstalled = installedPlugin != null;
-    final updateAvailable = state.availableUpdates[plugin.packageId];
+    final updateAvailable = state.availableUpdates[plugin.packageName];
 
     return ListTile(
       leading: Container(

@@ -73,7 +73,7 @@ Stream<SearchAggregateState> searchAllProviders(
                 description: item.description,
                 contentType: item.contentType,
                 episodes: item.episodes,
-                provider: provider.id,
+                provider: provider.packageName,
               ),
             )
             .toList();
@@ -100,7 +100,7 @@ Stream<SearchAggregateState> searchAllProviders(
 
         results.add(
           ProviderSearchResult(
-            providerId: provider.id,
+            providerId: provider.packageName,
             providerName: provider.name,
             results: filtered,
           ),
@@ -110,7 +110,7 @@ Stream<SearchAggregateState> searchAllProviders(
 
         results.add(
           ProviderSearchResult(
-            providerId: provider.id,
+            providerId: provider.packageName,
             providerName: provider.name,
             results: [],
             error: e.toString(),
