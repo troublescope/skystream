@@ -5,6 +5,7 @@ enum ProviderType { movie, series, anime, iptv, other }
 abstract class SkyStreamProvider {
   /// Unique Package Name (from plugin.json)
   String get packageName;
+
   /// Display Name
   String get name;
   String get mainUrl;
@@ -26,24 +27,32 @@ abstract class SkyStreamProvider {
 
 class StreamResult {
   final String url;
-  final String quality; // 720p, 1080p, etc
+  final String source;
   final Map<String, String>? headers;
   final List<SubtitleFile>? subtitles;
-
-  // DRM Fields
   final String? drmKid;
   final String? drmKey;
   final String? licenseUrl;
 
   const StreamResult({
     required this.url,
-    this.quality = 'Auto',
+    required this.source,
     this.headers,
     this.subtitles,
     this.drmKid,
     this.drmKey,
     this.licenseUrl,
   });
+
+  Map<String, dynamic> toJson() => {
+        'url': url,
+        'source': source,
+        'headers': headers,
+        'subtitles': subtitles?.map((x) => x.toJson()).toList(),
+        'drmKid': drmKid,
+        'drmKey': drmKey,
+        'licenseUrl': licenseUrl,
+      };
 }
 
 class SubtitleFile {
@@ -51,7 +60,17 @@ class SubtitleFile {
   final String label;
   final String? lang;
 
-  const SubtitleFile({required this.url, required this.label, this.lang});
+  SubtitleFile({
+    required this.url,
+    required this.label,
+    this.lang,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'url': url,
+        'label': label,
+        'lang': lang,
+      };
 
   factory SubtitleFile.fromJson(Map<String, dynamic> json) {
     return SubtitleFile(

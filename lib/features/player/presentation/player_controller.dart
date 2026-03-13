@@ -253,7 +253,7 @@ class PlayerController extends Notifier<PlayerState> {
 
       final stream = StreamResult(
         url: _videoUrl,
-        quality: isTorrent ? "Torrent" : "Video",
+        source: isTorrent ? "Torrent" : "Video",
         headers: {},
       );
 
@@ -268,7 +268,7 @@ class PlayerController extends Notifier<PlayerState> {
     if (_videoUrl.startsWith("magnet:") || _videoUrl.endsWith(".torrent")) {
       final stream = StreamResult(
         url: _videoUrl,
-        quality: "Torrent",
+        source: "Torrent",
         headers: {},
       );
       state = state.copyWith(streams: [stream], currentStreamIndex: 0);
@@ -332,7 +332,7 @@ class PlayerController extends Notifier<PlayerState> {
       currentStreamIndex: index,
       currentStream: stream,
       isLoading: true,
-      streamSubtitle: "$providerName - ${stream.quality}",
+      streamSubtitle: "$providerName - ${stream.source}",
       externalSubtitles: stream.subtitles ?? [],
     );
 
@@ -347,7 +347,7 @@ class PlayerController extends Notifier<PlayerState> {
       }
 
       state = state.copyWith(
-        streamSubtitle: "$providerName - ${stream.quality}",
+        streamSubtitle: "$providerName - ${stream.source}",
       );
 
       final headers = stream.headers ?? {};
@@ -400,7 +400,7 @@ class PlayerController extends Notifier<PlayerState> {
         ref.read(activeProviderStateProvider)?.name ??
         'Unknown';
     final pName = _getProviderDisplayName(rawPName);
-    state = state.copyWith(streamSubtitle: "$pName - ${stream.quality}");
+    state = state.copyWith(streamSubtitle: "$pName - ${stream.source}");
 
     final oldPos = _player.state.position;
     state = state.copyWith(isOpeningStream: true);
@@ -415,7 +415,7 @@ class PlayerController extends Notifier<PlayerState> {
         stopTorrentPolling();
       }
 
-      state = state.copyWith(streamSubtitle: "$pName - ${stream.quality}");
+      state = state.copyWith(streamSubtitle: "$pName - ${stream.source}");
 
       final headers = stream.headers ?? {};
       await _applyPlaybackProperties(headers, stream);
@@ -502,7 +502,7 @@ class PlayerController extends Notifier<PlayerState> {
 
         final newStream = StreamResult(
           url: url,
-          quality: "Torrent ($fileLabel)",
+          source: "Torrent ($fileLabel)",
           headers: {},
         );
         changeStream(newStream, resetPosition: true);
@@ -654,7 +654,7 @@ class PlayerController extends Notifier<PlayerState> {
   Future<String?> _resolveStreamUrl(StreamResult stream) async {
     if (stream.url.startsWith("magnet:") ||
         stream.url.endsWith(".torrent") ||
-        (stream.url.startsWith("/") && stream.quality.contains("Torrent"))) {
+        (stream.url.startsWith("/") && stream.source.contains("Torrent"))) {
       state = state.copyWith(streamSubtitle: "Initializing Torrent Engine...");
       final torrentUrl = await ref
           .read(torrentServiceProvider)
@@ -696,9 +696,9 @@ class PlayerController extends Notifier<PlayerState> {
       await native.setProperty('cache', 'yes');
       await native.setProperty('demuxer-max-bytes', '500MiB');
       await native.setProperty('demuxer-max-back-bytes', '50MiB');
-      
-      // Target a safe 15 seconds of read-ahead buffer. 
-      // This is large enough to absorb 4K chunk download latency, but 
+
+      // Target a safe 15 seconds of read-ahead buffer.
+      // This is large enough to absorb 4K chunk download latency, but
       // strictly smaller than the typical 30-second HLS live edge so it doesn't stall.
       await native.setProperty('demuxer-readahead-secs', '15');
 

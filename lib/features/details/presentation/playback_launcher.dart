@@ -147,7 +147,7 @@ class PlaybackLauncher {
     String playUrl = stream.url;
     if (stream.url.startsWith("magnet:") ||
         stream.url.endsWith(".torrent") ||
-        (stream.url.startsWith("/") && stream.quality.contains("Torrent"))) {
+        (stream.url.startsWith("/") && stream.source.contains("Torrent"))) {
       final torrentUrl = await _ref.read(torrentServiceProvider).getStreamUrl(stream.url);
       if (torrentUrl != null) {
         playUrl = torrentUrl;
@@ -217,8 +217,8 @@ class PlaybackLauncher {
                   itemCount: streams.length,
                   itemBuilder: (context, index) {
                     final stream = streams[index];
-                    final label = stream.quality != 'Auto'
-                        ? stream.quality
+                    final label = stream.source != 'Auto'
+                        ? stream.source
                         : 'Source ${index + 1}';
                     final host = Uri.tryParse(stream.url)?.host ?? '';
 

@@ -334,7 +334,7 @@ class JsBasedProvider extends SkyStreamProvider {
 
           return StreamResult(
             url: finalUrl,
-            quality: map['quality'] ?? "Auto",
+            source: map['source'] ?? "Auto",
             headers: map['headers'] != null
                 ? Map<String, String>.from(map['headers'])
                 : null,

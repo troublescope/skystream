@@ -11,6 +11,8 @@ import '../../network/cloudflare_bypass.dart';
 import 'package:encrypt/encrypt.dart' as encrypt_lib;
 
 import '../../network/dio_client_provider.dart';
+import 'package:html/parser.dart' as html_parser;
+import 'package:html/dom.dart' as html_dom;
 
 class JsPluginException implements Exception {
   final String code;
@@ -39,6 +41,7 @@ class JsEngineService {
 
   // Persistent callback registry to prevent memory leaks from dynamic listeners
   final Map<String, Completer<dynamic>> _pendingCallbacks = {};
+  final Map<String, dynamic> _domRegistry = {};
 
   JsEngineService(this._storage, this._dio) {
     final bool hasCookieManager = _dio.interceptors.any(
@@ -142,6 +145,73 @@ class JsEngineService {
     });
     _runtime.onMessage('get_storage', (dynamic args) {
       return _handleStorage(args, false);
+    });
+
+    // Base64 Bridge
+    _runtime.onMessage('base64_decode', (dynamic args) {
+      try {
+        return utf8.decode(base64.decode(args.toString()));
+      } catch (e) {
+        return null;
+      }
+    });
+
+    _runtime.onMessage('base64_encode', (dynamic args) {
+      try {
+        return base64.encode(utf8.encode(args.toString()));
+      } catch (e) {
+        return null;
+      }
+    });
+
+    // DOM Parser Bridge
+    _runtime.onMessage('dom_parse', (dynamic args) {
+      try {
+        final Map<String, dynamic> data = args is Map
+            ? Map<String, dynamic>.from(args)
+            : jsonDecode(args);
+        final String html = data['html'];
+        final String id = "doc_${DateTime.now().microsecondsSinceEpoch}";
+        final doc = html_parser.parse(html);
+        _domRegistry[id] = doc;
+        return id;
+      } catch (e) {
+        return null;
+      }
+    });
+
+    _runtime.onMessage('dom_query', (dynamic args) {
+      try {
+        final Map<String, dynamic> data = args is Map
+            ? Map<String, dynamic>.from(args)
+            : jsonDecode(args);
+        final String nodeId = data['nodeId'];
+        final String query = data['query'];
+        final bool multi = data['multi'] ?? false;
+
+        final node = _domRegistry[nodeId];
+        if (node == null) return null;
+
+        if (multi) {
+          final List<html_dom.Element> elements = (node is html_dom.Document) 
+              ? node.querySelectorAll(query) 
+              : (node as html_dom.Element).querySelectorAll(query);
+          return elements.map((e) => _serializeElement(e)).toList();
+        } else {
+          final html_dom.Element? element = (node is html_dom.Document)
+              ? node.querySelector(query)
+              : (node as html_dom.Element).querySelector(query);
+          return _serializeElement(element);
+        }
+      } catch (e) {
+        if (kDebugMode) debugPrint("[DOM Query Error] $e");
+        return null;
+      }
+    });
+
+    _runtime.onMessage('dom_dispose', (dynamic args) {
+      _domRegistry.remove(args.toString());
+      return "OK";
     });
 
     // Crypto Bridge
@@ -318,6 +388,91 @@ class JsEngineService {
       var source = {
          baseUrl: "",
          getStreamUrl: function() { return ""; }
+      };
+
+      // JSDOM Polyfill
+      globalThis.JSDOM = class JSDOM {
+        constructor(html) {
+          var id = sendMessage('dom_parse', JSON.stringify({ html: html }));
+          this.window = { document: new JSDocument(id) };
+        }
+      };
+
+      class JSNode {
+        constructor(nodeId, data) {
+          this.nodeId = nodeId;
+          this.data = data || {};
+          this.textContent = this.data.textContent || "";
+          this.innerHTML = this.data.innerHTML || "";
+          this.outerHTML = this.data.outerHTML || "";
+          this.tagName = this.data.tagName || "";
+        }
+        get className() {
+          return this.getAttribute('class') || "";
+        }
+        getAttribute(name) {
+          return this.data.attributes ? this.data.attributes[name] : null;
+        }
+        querySelector(query) {
+          var res = sendMessage('dom_query', JSON.stringify({ nodeId: this.nodeId, query: query, multi: false }));
+          if (typeof res === 'string') res = JSON.parse(res);
+          return res ? new JSNode(res.nodeId, res) : null;
+        }
+        querySelectorAll(query) {
+          var res = sendMessage('dom_query', JSON.stringify({ nodeId: this.nodeId, query: query, multi: true }));
+          if (typeof res === 'string') res = JSON.parse(res);
+          return (res || []).map(d => new JSNode(d.nodeId, d));
+        }
+      }
+
+      class JSDocument extends JSNode {
+        constructor(id) {
+          super(id, { nodeId: id });
+        }
+        get body() {
+          return this.querySelector('body');
+        }
+      }
+
+      // atob/btoa polyfills using bridge
+      globalThis.atob = function(str) {
+        return sendMessage('base64_decode', str);
+      };
+      globalThis.btoa = function(str) {
+        return sendMessage('base64_encode', str);
+      };
+
+      // URL Polyfill
+      globalThis.URL = class URL {
+        constructor(url, base) {
+          this.href = url;
+          if (base) {
+             // Basic support for base relative URLs
+             if (!url.startsWith('http')) {
+                var baseObj = new URL(base);
+                if (url.startsWith('/')) {
+                   this.href = baseObj.origin + url;
+                } else {
+                   this.href = baseObj.origin + baseObj.pathname.substring(0, baseObj.pathname.lastIndexOf('/') + 1) + url;
+                }
+             }
+          }
+          
+          var match = this.href.match(/^([^:/?#]+:)?(\\/\\/([^/?#]*))?([^?#]*)(\\?([^#]*))?(#(.*))?/);
+          if (!match) throw new Error("Invalid URL");
+          
+          this.protocol = match[1] || "";
+          this.host = match[3] || "";
+          this.pathname = match[4] || "/";
+          this.search = match[5] || "";
+          this.hash = match[7] || "";
+          
+          var hostParts = this.host.split(':');
+          this.hostname = hostParts[0];
+          this.port = hostParts[1] || "";
+          this.origin = this.protocol + "//" + this.host;
+        }
+        toString() { return this.href; }
       };
     """);
   }
@@ -555,5 +710,20 @@ class JsEngineService {
       return "${msg.substring(0, 3000)}... [Truncated]";
     }
     return msg;
+  }
+
+  Map<String, dynamic>? _serializeElement(html_dom.Element? element) {
+    if (element == null) return null;
+    final String nodeId = "node_${DateTime.now().microsecondsSinceEpoch}_${element.hashCode}";
+    _domRegistry[nodeId] = element;
+    
+    return {
+      'nodeId': nodeId,
+      'tagName': element.localName,
+      'attributes': element.attributes.map((k, v) => MapEntry(k.toString(), v)),
+      'textContent': element.text,
+      'innerHTML': element.innerHtml,
+      'outerHTML': element.outerHtml,
+    };
   }
 }

@@ -49,13 +49,13 @@ class PlayerBottomSheets {
                     final isSelected = s == currentStream;
                     return ListTile(
                       leading: Icon(
-                        Icons.high_quality,
+                        Icons.source,
                         color: isSelected
                             ? theme.colorScheme.primary
                             : theme.iconTheme.color,
                       ),
                       title: Text(
-                        s.quality,
+                        s.source,
                         style: TextStyle(
                           color: isSelected
                               ? theme.colorScheme.primary
