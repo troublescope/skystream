@@ -1,0 +1,350 @@
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
+import 'package:skystream/core/domain/entity/multimedia_item.dart';
+import 'package:skystream/core/utils/image_fallbacks.dart';
+import 'package:intl/intl.dart';
+
+class MetadataBar extends StatelessWidget {
+  final MultimediaItem item;
+  const MetadataBar({super.key, required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    // theme and context used in helper methods
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        if (item.year != null) 
+          _buildInfoText(context, item.year.toString()),
+        if (item.contentRating != null)
+          _buildBorderedInfo(context, item.contentRating!),
+        if (item.duration != null)
+          _buildInfoText(context, "${item.duration}m"),
+        if (item.score != null)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.star_rounded, size: 16, color: Colors.amber),
+              const SizedBox(width: 4),
+              _buildInfoText(context, item.score!.toStringAsFixed(1)),
+            ],
+          ),
+        if (item.vpnStatus != VpnStatus.none)
+           _buildVpnBadge(context, item.vpnStatus),
+         if (item.isAdult)
+           _buildBorderedInfo(context, "18+", color: Colors.redAccent),
+      ],
+    );
+  }
+
+  Widget _buildInfoText(BuildContext context, String text) {
+    return Text(
+      text,
+      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+        fontWeight: FontWeight.w500,
+      ),
+    );
+  }
+
+  Widget _buildBorderedInfo(BuildContext context, String text, {Color? color}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      decoration: BoxDecoration(
+        border: Border.all(color: color ?? Theme.of(context).dividerColor),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: color ?? Theme.of(context).colorScheme.onSurfaceVariant,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVpnBadge(BuildContext context, VpnStatus status) {
+    final color = status == VpnStatus.mightBeNeeded ? Colors.orange : Colors.blue;
+    final label = status == VpnStatus.mightBeNeeded ? "VPN Possible" : "Torrent (VPN Rec)";
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.vpn_lock_rounded, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class NextAiringWidget extends StatelessWidget {
+  final NextAiring nextAiring;
+  const NextAiringWidget({super.key, required this.nextAiring});
+
+  @override
+  Widget build(BuildContext context) {
+    final date = DateTime.fromMillisecondsSinceEpoch(nextAiring.unixTime * 1000);
+    final formattedDate = DateFormat('MMM dd, yyyy (hh:mm a)').format(date);
+    
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.upcoming_rounded, size: 20, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(width: 8),
+              Text(
+                "Next episode airing",
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "Episode ${nextAiring.episode} of Season ${nextAiring.season} will air on:",
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          Text(
+            formattedDate,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: Theme.of(context).colorScheme.primary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class CastCarousel extends StatelessWidget {
+  final List<Actor> cast;
+  const CastCarousel({super.key, required this.cast});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: Text(
+            "Cast",
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+          ),
+        ),
+        SizedBox(
+          height: 120,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: cast.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 16),
+            itemBuilder: (context, index) {
+              final actor = cast[index];
+              return SizedBox(
+                width: 80,
+                child: Column(
+                  children: [
+                    CircleAvatar(
+                      radius: 35,
+                      backgroundImage: actor.image != null 
+                        ? CachedNetworkImageProvider(actor.image!) 
+                        : null,
+                      child: actor.image == null ? const Icon(Icons.person) : null,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      actor.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    if (actor.role != null)
+                      Text(
+                        actor.role!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Theme.of(context).hintColor),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class TrailersSection extends StatelessWidget {
+  final List<Trailer> trailers;
+  const TrailersSection({super.key, required this.trailers});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: Text(
+            "Trailers & Extras",
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+          ),
+        ),
+        SizedBox(
+          height: 160,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: trailers.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 16),
+            itemBuilder: (context, index) {
+              final trailer = trailers[index];
+              return Container(
+                width: 240,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: Theme.of(context).colorScheme.surfaceContainer,
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    CachedNetworkImage(
+                      imageUrl: "https://img.youtube.com/vi/${_extractYoutubeId(trailer.url)}/mqdefault.jpg",
+                      fit: BoxFit.cover,
+                      errorWidget: (_, __, ___) => const Center(child: Icon(Icons.movie_rounded)),
+                    ),
+                    Container(
+                      color: Colors.black26,
+                      child: const Center(
+                        child: Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 48),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.black87,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          "Trailer",
+                          style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    )
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _extractYoutubeId(String url) {
+    // Simple extraction for common patterns
+    if (url.contains("v=")) return url.split("v=")[1].split("&")[0];
+    if (url.contains("be/")) return url.split("be/")[1].split("?")[0];
+    return "";
+  }
+}
+
+class RecommendationsCarousel extends StatelessWidget {
+  final List<MultimediaItem> items;
+  final Function(MultimediaItem) onItemTap;
+
+  const RecommendationsCarousel({
+    super.key,
+    required this.items,
+    required this.onItemTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: Text(
+            "More Like This",
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+          ),
+        ),
+        SizedBox(
+          height: 180,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: items.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final item = items[index];
+              return InkWell(
+                onTap: () => onItemTap(item),
+                child: SizedBox(
+                  width: 110,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: CachedNetworkImage(
+                            imageUrl: AppImageFallbacks.poster(item.posterUrl, label: item.title),
+                            fit: BoxFit.cover,
+                            width: 110,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        item.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}

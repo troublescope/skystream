@@ -13,6 +13,7 @@ import '../../library/presentation/library_provider.dart';
 
 import 'details_controller.dart';
 import "widgets/details_layout_widgets.dart";
+import "widgets/premium_details_widgets.dart";
 
 class DetailsScreen extends ConsumerStatefulWidget {
   final MultimediaItem item;
@@ -208,23 +209,31 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                item.title,
-                style: Theme.of(
-                  context,
-                ).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.bold),
-              ),
+              if (item.logoUrl != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16.0),
+                  child: CachedNetworkImage(
+                    imageUrl: item.logoUrl!,
+                    height: 80,
+                    fit: BoxFit.contain,
+                    alignment: Alignment.centerLeft,
+                  ),
+                )
+              else
+                Text(
+                  item.title,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.bold),
+                ),
               const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  if (item.episodes != null && item.episodes!.length > 1)
-                    DetailsChip(label: '${item.episodes!.length} Eps'),
-                  if (item.provider != null)
-                    DetailsProviderChip(providerName: item.provider!),
-                ],
-              ),
+              const SizedBox(height: 16),
+              MetadataBar(item: item),
+              const SizedBox(height: 24),
+              if (item.nextAiring != null) ...[
+                NextAiringWidget(nextAiring: item.nextAiring!),
+                const SizedBox(height: 24),
+              ],
               const SizedBox(height: 24),
               Text(
                 'Synopsis',
@@ -262,6 +271,31 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
                 ),
               ] else
                 const Text("No episodes found."),
+              
+              if (item.cast != null && item.cast!.isNotEmpty) ...[
+                const SizedBox(height: 32),
+                CastCarousel(cast: item.cast!),
+              ],
+              
+              if (item.trailers != null && item.trailers!.isNotEmpty) ...[
+                const SizedBox(height: 32),
+                TrailersSection(trailers: item.trailers!),
+              ],
+              
+              if (item.recommendations != null && item.recommendations!.isNotEmpty) ...[
+                const SizedBox(height: 32),
+                RecommendationsCarousel(
+                  items: item.recommendations!,
+                  onItemTap: (rec) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => DetailsScreen(item: rec),
+                      ),
+                    );
+                  },
+                ),
+              ],
               const SizedBox(height: 50),
             ],
           ),
@@ -300,23 +334,23 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    item.title,
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+                  if (item.logoUrl != null)
+                    CachedNetworkImage(
+                      imageUrl: item.logoUrl!,
+                      height: 50,
+                      fit: BoxFit.contain,
+                      alignment: Alignment.centerLeft,
+                    )
+                  else
+                    Text(
+                      item.title,
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
                   const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      if (item.episodes != null && item.episodes!.length > 1)
-                        DetailsChip(label: '${item.episodes!.length} Eps'),
-                      if (item.provider != null)
-                        DetailsProviderChip(providerName: item.provider!),
-                    ],
-                  ),
+                  const SizedBox(height: 8),
+                  MetadataBar(item: item),
                 ],
               ),
             ),
@@ -324,6 +358,10 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
         ),
         const SizedBox(height: 24),
         DetailsActionButtons(item: widget.item, details: details, state: state),
+        if (item.nextAiring != null) ...[
+          const SizedBox(height: 16),
+          NextAiringWidget(nextAiring: item.nextAiring!),
+        ],
         const SizedBox(height: 24),
         Text(
           'Synopsis',
@@ -365,6 +403,31 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
           ),
         ] else
           const Text("No episodes found."),
+        
+        if (item.cast != null && item.cast!.isNotEmpty) ...[
+          const SizedBox(height: 32),
+          CastCarousel(cast: item.cast!),
+        ],
+        
+        if (item.trailers != null && item.trailers!.isNotEmpty) ...[
+          const SizedBox(height: 32),
+          TrailersSection(trailers: item.trailers!),
+        ],
+        
+        if (item.recommendations != null && item.recommendations!.isNotEmpty) ...[
+          const SizedBox(height: 32),
+          RecommendationsCarousel(
+            items: item.recommendations!,
+            onItemTap: (rec) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => DetailsScreen(item: rec),
+                ),
+              );
+            },
+          ),
+        ],
         const SizedBox(height: 50),
       ],
     );

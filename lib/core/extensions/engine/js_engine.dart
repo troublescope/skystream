@@ -214,6 +214,18 @@ class JsEngineService {
       return "OK";
     });
 
+    // Native SDK Helpers
+    _runtime.onMessage('register_settings', (dynamic args) {
+      if (kDebugMode) debugPrint("[JS SDK] Settings Registration: $args");
+      // Future: Store schema in extension database for UI generation
+    });
+
+    _runtime.onMessage('solve_captcha', (dynamic args) async {
+      if (kDebugMode) debugPrint("[JS SDK] Captcha Solve Requested: $args");
+      // Placeholder: In a real implementation, this would trigger a WebView dialog
+      return "mock_captcha_token";
+    });
+
     // Crypto Bridge
     _runtime.onMessage('crypto_decrypt_aes', (dynamic args) async {
       try {
@@ -339,36 +351,51 @@ class JsEngineService {
 
     // Standard Entities
     _runtime.evaluate("""
+      class Actor {
+        constructor(params) {
+          Object.assign(this, params);
+        }
+      }
+
+      class Trailer {
+        constructor(params) {
+          Object.assign(this, params);
+        }
+      }
+
+      class NextAiring {
+        constructor(params) {
+          Object.assign(this, params);
+        }
+      }
+
       class MultimediaItem {
-        constructor({ title, url, posterUrl, type, bannerUrl, description, episodes, headers, provider }) {
-          this.title = title;
-          this.url = url;
-          this.posterUrl = posterUrl;
-          this.type = type || 'movie';
-          this.bannerUrl = bannerUrl;
-          this.description = description;
-          this.episodes = episodes;
-          this.headers = headers;
-          this.provider = provider;
+        constructor(params) {
+          Object.assign(this, {
+            type: 'movie',
+            status: 'ongoing',
+            vpnStatus: 'none',
+            isAdult: false,
+            ...params
+          });
         }
       }
 
       class Episode {
-        constructor({ name, url, season, episode, description, posterUrl, headers }) {
-          this.name = name;
-          this.url = url;
-          this.season = season || 0;
-          this.episode = episode || 0;
-          this.description = description;
-          this.posterUrl = posterUrl;
-          this.headers = headers;
+        constructor(params) {
+          Object.assign(this, {
+            season: 0,
+            episode: 0,
+            dubStatus: 'none',
+            ...params
+          });
         }
       }
 
       class StreamResult {
-        constructor({ url, quality, headers, subtitles, drmKid, drmKey, licenseUrl }) {
+        constructor({ url, source, quality, headers, subtitles, drmKid, drmKey, licenseUrl }) {
           this.url = url;
-          this.quality = quality || 'Auto';
+          this.source = source || quality || 'Auto';
           this.headers = headers;
           this.subtitles = subtitles;
           this.drmKid = drmKid;
@@ -380,14 +407,28 @@ class JsEngineService {
       globalThis.MultimediaItem = MultimediaItem;
       globalThis.Episode = Episode;
       globalThis.StreamResult = StreamResult;
+      globalThis.Actor = Actor;
+      globalThis.Trailer = Trailer;
+      globalThis.NextAiring = NextAiring;
 
       var CloudStream = {
          getLanguage: function() { return "en"; },
          getRegion: function() { return "US"; }
       };
-      var source = {
-         baseUrl: "",
-         getStreamUrl: function() { return ""; }
+
+      // Native SDK Parity Helpers
+      globalThis.registerSettings = function(schema) {
+         sendMessage('register_settings', JSON.stringify(schema));
+      };
+
+      globalThis.solveCaptcha = async function(siteKey, url) {
+         return await sendMessage('solve_captcha', JSON.stringify({ siteKey: siteKey, url: url || "" }));
+      };
+
+      globalThis.crypto = {
+         decryptAES: async function(data, key, iv) {
+            return await sendMessage('crypto_decrypt_aes', JSON.stringify({ data: data, key: key, iv: iv }));
+         }
       };
 
       // JSDOM Polyfill
