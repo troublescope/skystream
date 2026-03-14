@@ -38,6 +38,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   final GlobalKey<SkyStreamPlayerControlsState> _controlsKeyFinal = GlobalKey();
 
   bool _isTv = false;
+  bool _isTablet = false;
   late final FocusNode _skipFocusNode;
 
   late final PlayerController _playerController;
@@ -49,7 +50,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     MediaKit.ensureInitialized();
     WidgetsBinding.instance.addObserver(this);
 
-    _isTv = ref.read(deviceProfileProvider).asData?.value.isTv ?? false;
+    final deviceProfile = ref.read(deviceProfileProvider).asData?.value;
+    _isTv = deviceProfile?.isTv ?? false;
+    _isTablet = deviceProfile?.isTablet ?? false;
 
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     WakelockPlus.enable();
@@ -132,7 +135,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
         DeviceOrientation.landscapeLeft,
         DeviceOrientation.landscapeRight,
       ]);
+    } else if (_isTablet) {
+      // For tablets, allow system default orientation (usually follows sensor)
+      // This prevents forcing portrait mode when the user is holding it in landscape
+      SystemChrome.setPreferredOrientations([]);
     } else {
+      // For phones, typically reset to portrait
       SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     }
     if (!Platform.isAndroid && !Platform.isIOS) {
