@@ -8,9 +8,11 @@ import 'package:skystream/features/library/presentation/history_provider.dart';
 import '../../discover/presentation/widgets/discover_carousel.dart';
 import '../../discover/presentation/widgets/media_horizontal_list.dart';
 import '../../discover/presentation/view_all_screen.dart';
+import '../../../shared/widgets/desktop_scroll_wrapper.dart';
 
 import 'package:flutter/rendering.dart';
 import 'package:skystream/core/extensions/extension_manager.dart';
+import 'package:skystream/core/extensions/base_provider.dart';
 import 'package:skystream/core/domain/entity/multimedia_item.dart';
 import 'package:skystream/core/router/app_router.dart';
 import '../../../core/models/tmdb_item.dart';
@@ -259,7 +261,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     onTap: (tmdbItem) {
                       final item = tmdbItem.sourceItem;
                       if (item != null) {
-                        context.push('/details', extra: DetailsRouteExtra(item: item));
+                        context.push(
+                          '/details',
+                          extra: DetailsRouteExtra(item: item),
+                        );
                       }
                     },
                   ),
@@ -276,7 +281,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     onTap: (tmdbItem) {
                       final item = tmdbItem.sourceItem;
                       if (item != null) {
-                        context.push('/details', extra: DetailsRouteExtra(item: item));
+                        context.push(
+                          '/details',
+                          extra: DetailsRouteExtra(item: item),
+                        );
                       }
                     },
                   ),
@@ -293,31 +301,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
               // Category sections — lazily built
               SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    if (index >= filteredEntries.length) return null;
-                    final entry = filteredEntries[index];
-                    return RepaintBoundary(
-                      child: MediaHorizontalList(
-                        title: entry.key,
-                        mediaList: entry.value
-                            .cast<MultimediaItem>()
-                            .map(_toTmdbItem)
-                            .toList(),
-                        category: ViewAllCategory.trending,
-                        showViewAll: false,
-                        onTap: (tmdbItem) {
-                          final item = tmdbItem.sourceItem;
-                          if (item != null) {
-                            context.push('/details', extra: DetailsRouteExtra(item: item));
-                          }
-                        },
-                        heroTagPrefix: 'home',
-                      ),
-                    );
-                  },
-                  childCount: filteredEntries.length,
-                ),
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  if (index >= filteredEntries.length) return null;
+                  final entry = filteredEntries[index];
+                  return RepaintBoundary(
+                    child: MediaHorizontalList(
+                      title: entry.key,
+                      mediaList: entry.value
+                          .cast<MultimediaItem>()
+                          .map(_toTmdbItem)
+                          .toList(),
+                      category: ViewAllCategory.trending,
+                      showViewAll: false,
+                      onTap: (tmdbItem) {
+                        final item = tmdbItem.sourceItem;
+                        if (item != null) {
+                          context.push(
+                            '/details',
+                            extra: DetailsRouteExtra(item: item),
+                          );
+                        }
+                      },
+                      heroTagPrefix: 'home',
+                    ),
+                  );
+                }, childCount: filteredEntries.length),
               ),
 
               // Bottom padding for FAB
@@ -398,112 +406,166 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   void _showProviderSelector(BuildContext context, WidgetRef ref) {
     final extManager = ref.read(extensionManagerProvider.notifier);
     final activeProvider = ref.read(activeProviderStateProvider);
-    final providers = extManager.getAllProviders();
-
-    // Find index of selected provider for auto-scroll
-    int selectedIndex = 0; // 0 is "None"
-    if (activeProvider != null) {
-      for (int i = 0; i < providers.length; i++) {
-        if (providers[i].packageName == activeProvider.packageName) {
-          selectedIndex = i + 1; // +1 because "None" is at index 0
-          break;
-        }
-      }
-    }
+    final providers = List<SkyStreamProvider>.from(extManager.getAllProviders())
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
     final scrollController = ScrollController();
+    final chipsScrollController = ScrollController();
+    final filterNotifier = ValueNotifier<ProviderType?>(null);
+
     showDialog(
       context: context,
       builder: (context) {
-        // Auto-scroll to selected item after dialog opens
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (scrollController.hasClients && selectedIndex > 0) {
-            // Approximate height of each RadioListTile
-            const itemHeight = 56.0;
-            final targetOffset = (selectedIndex * itemHeight) - 100;
-            scrollController.animateTo(
-              targetOffset.clamp(
-                0.0,
-                scrollController.position.maxScrollExtent,
-              ),
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeOut,
-            );
-          }
-        });
-
         return AlertDialog(
           title: const Text('Select Provider'),
-          content: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.sizeOf(context).height * 0.6,
-            ),
-            child: RadioGroup<String?>(
-              groupValue: activeProvider?.packageName,
-              onChanged: (val) {
-                if (val == null) {
-                  ref.read(activeProviderStateProvider.notifier).set(null);
-                } else {
-                  final selected = providers.firstWhere((p) => p.packageName == val);
-                  ref.read(activeProviderStateProvider.notifier).set(selected);
-                }
-                Navigator.pop(context);
-                // ignore: unused_result
-                ref.refresh(homeDataProvider);
-              },
-              child: SizedBox(
-                width: 400, // Fixed width for better appearance on desktop
-                child: ListView.builder(
-                  controller: scrollController,
-                  shrinkWrap: true,
-                  itemCount: providers.length + 1, // +1 for "None"
-                  itemBuilder: (context, index) {
-                    if (index == 0) {
-                      // "None" option
-                      return const RadioListTile<String?>(
-                        title: Text('None'),
-                        value: null,
-                      );
-                    }
-
-                    final p = providers[index - 1];
-                    final isDebug = p.isDebug;
-                    return RadioListTile<String?>(
-                      title: Row(
-                        children: [
-                          Text(p.name),
-                          if (isDebug) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 4,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.red,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Text(
-                                'DEBUG',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+          contentPadding: const EdgeInsets.fromLTRB(0, 20, 0, 0),
+          content: SizedBox(
+            width: 600,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Filter Chips
+                ValueListenableBuilder<ProviderType?>(
+                  valueListenable: filterNotifier,
+                  builder: (context, currentFilter, _) {
+                    return DesktopScrollWrapper(
+                      controller: chipsScrollController,
+                      isCompact: true,
+                      child: SingleChildScrollView(
+                        controller: chipsScrollController,
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Row(
+                          children: [
+                            FilterChip(
+                              visualDensity: VisualDensity.compact,
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                              label: const Text('All'),
+                              selected: currentFilter == null,
+                              onSelected: (_) => filterNotifier.value = null,
                             ),
+                            const SizedBox(width: 8),
+                            ...ProviderType.values
+                                .where((t) => t != ProviderType.other)
+                                .map((type) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: FilterChip(
+                                      visualDensity: VisualDensity.compact,
+                                      materialTapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                      label: Text(
+                                        type.name[0].toUpperCase() +
+                                            type.name.substring(1),
+                                      ),
+                                      selected: currentFilter == type,
+                                      onSelected: (_) =>
+                                          filterNotifier.value = type,
+                                    ),
+                                  );
+                                }),
                           ],
-                        ],
+                        ),
                       ),
-                      value: p.packageName,
                     );
                   },
                 ),
-              ),
+                const Divider(),
+                Flexible(
+                  child: ValueListenableBuilder<ProviderType?>(
+                    valueListenable: filterNotifier,
+                    builder: (context, filter, _) {
+                      final filteredProviders = filter == null
+                          ? providers
+                          : providers
+                                .where((p) => p.supportedTypes.contains(filter))
+                                .toList();
+
+                      return ListView.builder(
+                        controller: scrollController,
+                        shrinkWrap: true,
+                        itemCount:
+                            (filter == null ? 1 : 0) + filteredProviders.length,
+                        itemBuilder: (context, index) {
+                          if (filter == null && index == 0) {
+                            return RadioListTile<String?>(
+                              title: const Text('None'),
+                              value: null,
+                              groupValue: activeProvider?.packageName,
+                              onChanged: (val) {
+                                ref
+                                    .read(activeProviderStateProvider.notifier)
+                                    .set(null);
+                                Navigator.pop(context);
+                                // ignore: unused_result
+                                ref.refresh(homeDataProvider);
+                              },
+                            );
+                          }
+
+                          final p =
+                              filteredProviders[filter == null
+                                  ? index - 1
+                                  : index];
+                          final isDebug = p.isDebug;
+                          return RadioListTile<String?>(
+                            title: Row(
+                              children: [
+                                Expanded(child: Text(p.name)),
+                                if (isDebug) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 4,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text(
+                                      'DEBUG',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            value: p.packageName,
+                            groupValue: activeProvider?.packageName,
+                            onChanged: (val) {
+                              ref
+                                  .read(activeProviderStateProvider.notifier)
+                                  .set(p);
+                              Navigator.pop(context);
+                              // ignore: unused_result
+                              ref.refresh(homeDataProvider);
+                            },
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
         );
       },
-    ).then((_) => scrollController.dispose());
+    ).then((_) {
+      scrollController.dispose();
+      filterNotifier.dispose();
+    });
   }
 }

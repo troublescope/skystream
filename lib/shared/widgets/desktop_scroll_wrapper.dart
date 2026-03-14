@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import '../../core/utils/layout_constants.dart';
 
 class DesktopScrollWrapper extends StatefulWidget {
   final Widget child;
@@ -12,6 +11,9 @@ class DesktopScrollWrapper extends StatefulWidget {
   /// Whether to show navigation buttons. If null, defaults to true on desktop platforms.
   final bool? showButtons;
 
+  /// Whether to use compact styling (smaller buttons/padding).
+  final bool isCompact;
+
   const DesktopScrollWrapper({
     super.key,
     required this.child,
@@ -20,6 +22,7 @@ class DesktopScrollWrapper extends StatefulWidget {
     this.onScrollLeft,
     this.onScrollRight,
     this.showButtons,
+    this.isCompact = false,
   });
 
   @override
@@ -105,13 +108,12 @@ class _DesktopScrollWrapperState extends State<DesktopScrollWrapper> {
 
         // Left Button
         if (_showLeft)
-          Positioned(
-            left: 0,
-            top: 0,
-            bottom: 0,
-            child: Center(
+          Positioned.fill(
+            child: Align(
+              alignment: Alignment.centerLeft,
               child: _ScrollButton(
                 icon: Icons.chevron_left,
+                isCompact: widget.isCompact,
                 onTap: () => _scroll(false),
               ),
             ),
@@ -119,13 +121,12 @@ class _DesktopScrollWrapperState extends State<DesktopScrollWrapper> {
 
         // Right Button
         if (_showRight)
-          Positioned(
-            right: 0,
-            top: 0,
-            bottom: 0,
-            child: Center(
+          Positioned.fill(
+            child: Align(
+              alignment: Alignment.centerRight,
               child: _ScrollButton(
                 icon: Icons.chevron_right,
+                isCompact: widget.isCompact,
                 onTap: () => _scroll(true),
               ),
             ),
@@ -138,8 +139,13 @@ class _DesktopScrollWrapperState extends State<DesktopScrollWrapper> {
 class _ScrollButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
+  final bool isCompact;
 
-  const _ScrollButton({required this.icon, required this.onTap});
+  const _ScrollButton({
+    required this.icon,
+    required this.onTap,
+    this.isCompact = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -153,8 +159,12 @@ class _ScrollButton extends StatelessWidget {
           customBorder: const CircleBorder(),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.all(LayoutConstants.spacingXs),
-            child: Icon(icon, color: Theme.of(context).colorScheme.onSurface),
+            padding: EdgeInsets.all(isCompact ? 4.0 : 8.0),
+            child: Icon(
+              icon,
+              color: Theme.of(context).colorScheme.onSurface,
+              size: isCompact ? 20 : 24,
+            ),
           ),
         ),
       ),
