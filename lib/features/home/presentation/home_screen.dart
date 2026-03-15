@@ -344,7 +344,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       id: item.url.hashCode,
       title: item.title,
       posterPath: item.posterUrl,
-      mediaType: 'movie',
+      mediaType: item.contentType.name,
       releaseDate: '',
       voteAverage: 0.0,
       overview: item.description ?? '',

@@ -56,7 +56,8 @@ class _DiscoverCarouselState extends State<DiscoverCarousel> {
 
     final size = MediaQuery.sizeOf(context);
     final heroHeight = size.height * 0.60;
-    final isDesktop = size.width > LayoutConstants.discoverCarouselDesktopBreakpoint;
+    final isDesktop =
+        size.width > LayoutConstants.discoverCarouselDesktopBreakpoint;
 
     return SizedBox(
       height: heroHeight,
@@ -128,7 +129,9 @@ class _DiscoverCarouselState extends State<DiscoverCarousel> {
                     child: IconButton(
                       onPressed: () => _carouselController.previousPage(),
                       style: IconButton.styleFrom(
-                        padding: const EdgeInsets.all(LayoutConstants.spacingMd),
+                        padding: const EdgeInsets.all(
+                          LayoutConstants.spacingMd,
+                        ),
                       ),
                       icon: const Icon(
                         Icons.arrow_back_ios_new,
@@ -158,7 +161,9 @@ class _DiscoverCarouselState extends State<DiscoverCarousel> {
                     child: IconButton(
                       onPressed: () => _carouselController.nextPage(),
                       style: IconButton.styleFrom(
-                        padding: const EdgeInsets.all(LayoutConstants.spacingMd),
+                        padding: const EdgeInsets.all(
+                          LayoutConstants.spacingMd,
+                        ),
                       ),
                       icon: const Icon(
                         Icons.arrow_forward_ios,
@@ -207,12 +212,28 @@ class _DiscoverCarouselState extends State<DiscoverCarousel> {
     final isMovie = movie.mediaType == 'movie';
 
     String? type;
-    if (movie.mediaType == 'movie') {
+    IconData? typeIcon;
+    final mType = movie.mediaType.toLowerCase();
+
+    if (mType == 'movie') {
       type = "Movie";
-    } else if (movie.mediaType == 'tv') {
+      typeIcon = Icons.movie_outlined;
+    } else if (mType == 'series' || mType == 'tv') {
       type = "TV Show";
+      typeIcon = Icons.tv;
+    } else if (mType == 'anime') {
+      type = "Anime";
+      typeIcon = Icons.animation;
+    } else if (mType == 'livestream') {
+      type = "Live Stream";
+      typeIcon = Icons.live_tv;
+    } else {
+      // Capitalize first letter as fallback
+      type = mType.isNotEmpty
+          ? mType[0].toUpperCase() + mType.substring(1)
+          : null;
+      typeIcon = Icons.movie_outlined;
     }
-    // If media_type is null or unknown, type remains null
 
     final genres = movie.genresStr ?? '';
 
@@ -273,8 +294,7 @@ class _DiscoverCarouselState extends State<DiscoverCarousel> {
                     memCacheWidth:
                         1080, // High enough for quality, constrained for memory
                     placeholder: (context, url) => const ShimmerPlaceholder(),
-                    errorWidget: (_, _, _) =>
-                        const ThumbnailErrorPlaceholder(),
+                    errorWidget: (_, _, _) => const ThumbnailErrorPlaceholder(),
                   ),
                 ),
 
@@ -371,7 +391,9 @@ class _DiscoverCarouselState extends State<DiscoverCarousel> {
                           // Logo or Title Fallback
                           if (logoUrl != null)
                             Padding(
-                              padding: const EdgeInsets.only(bottom: LayoutConstants.spacingLg),
+                              padding: const EdgeInsets.only(
+                                bottom: LayoutConstants.spacingLg,
+                              ),
                               child: _buildLogo(logoUrl, title),
                             )
                           else
@@ -383,7 +405,7 @@ class _DiscoverCarouselState extends State<DiscoverCarousel> {
                             children: [
                               if (type != null) ...[
                                 Icon(
-                                  isMovie ? Icons.movie_outlined : Icons.tv,
+                                  typeIcon,
                                   color: Theme.of(context).colorScheme.onSurface
                                       .withValues(alpha: 0.7),
                                   size: 16,
