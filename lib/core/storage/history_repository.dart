@@ -35,7 +35,9 @@ class HistoryItem {
         posterUrl: map['posterUrl'] ?? '',
         bannerUrl: map['bannerUrl'],
         description: map['description'],
-        contentType: MultimediaItem.parseContentType(map['type'] ?? map['contentType'] ?? 'movie'),
+        contentType: MultimediaItem.parseContentType(
+          map['type'] ?? map['contentType'] ?? 'movie',
+        ),
         provider: map['provider'],
       ),
       position: map['position'] ?? 0,
@@ -96,6 +98,18 @@ class HistoryRepository {
 
   int getPosition(String url) {
     return _storageService.getPosition(url);
+  }
+
+  int getEpisodePosition(String url) {
+    return _storageService.getEpisodePosition(url);
+  }
+
+  int getDuration(String url) {
+    return _storageService.getDuration(url);
+  }
+
+  int getEpisodeDuration(String url) {
+    return _storageService.getEpisodeDuration(url);
   }
 
   String? getLastStreamUrl(String url) {

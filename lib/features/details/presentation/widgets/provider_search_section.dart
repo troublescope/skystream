@@ -123,9 +123,12 @@ class _ProviderSearchSectionState extends ConsumerState<ProviderSearchSection> {
                 scrollDirection: Axis.horizontal,
                 padding: widget.compact
                     ? EdgeInsets.zero
-                    : const EdgeInsets.symmetric(horizontal: LayoutConstants.spacingMd),
+                    : const EdgeInsets.symmetric(
+                        horizontal: LayoutConstants.spacingMd,
+                      ),
                 itemCount: allItems.length,
-                separatorBuilder: (_, _) => const SizedBox(width: LayoutConstants.spacingSm),
+                separatorBuilder: (_, _) =>
+                    const SizedBox(width: LayoutConstants.spacingSm),
                 itemBuilder: (context, index) {
                   final data = allItems[index];
                   final item = data['item'] as MultimediaItem;
@@ -136,13 +139,16 @@ class _ProviderSearchSectionState extends ConsumerState<ProviderSearchSection> {
                       // Enrich item with provider and content type before navigation
                       final enrichedItem = item.copyWith(
                         provider: providerName,
-                        contentType: widget.parentMediaType != null 
-                            ? MultimediaItem.parseContentType(widget.parentMediaType)
+                        contentType: widget.parentMediaType != null
+                            ? MultimediaItem.parseContentType(
+                                widget.parentMediaType,
+                              )
                             : item.contentType,
                       );
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (context) => DetailsScreen(item: enrichedItem),
+                          builder: (context) =>
+                              DetailsScreen(item: enrichedItem),
                         ),
                       );
                     },
@@ -273,7 +279,9 @@ class _ProviderSearchSectionState extends ConsumerState<ProviderSearchSection> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: LayoutConstants.spacingMd),
+            padding: const EdgeInsets.symmetric(
+              horizontal: LayoutConstants.spacingMd,
+            ),
             child: Row(
               children: [
                 Icon(

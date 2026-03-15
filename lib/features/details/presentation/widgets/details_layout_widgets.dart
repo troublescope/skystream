@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:skystream/core/domain/entity/multimedia_item.dart';
 import '../../../../core/storage/history_repository.dart';
-import 'package:skystream/core/utils/image_fallbacks.dart';
 import 'package:skystream/core/utils/layout_constants.dart';
 import 'package:skystream/shared/widgets/custom_widgets.dart';
 import '../details_controller.dart';
 import 'package:skystream/core/extensions/extension_manager.dart';
-import 'package:skystream/shared/widgets/thumbnail_error_placeholder.dart';
+import 'episode_card.dart';
 
 class DetailsSeasonSelector extends ConsumerWidget {
   final DetailsState state;
@@ -65,11 +63,20 @@ class DetailsActionButtons extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    bool isResuming = false;
-    if (state.isMovie) {
-      final historyRepo = ref.watch(historyRepositoryProvider);
-      final pos = historyRepo.getPosition(item.url);
-      if (pos > 5000) isResuming = true;
+    final historyRepo = ref.watch(historyRepositoryProvider);
+    final targetEpisode = state.targetEpisode;
+    final pos = targetEpisode != null 
+        ? historyRepo.getEpisodePosition(targetEpisode.url)
+        : historyRepo.getPosition(item.url);
+    final dur = targetEpisode != null 
+        ? historyRepo.getEpisodeDuration(targetEpisode.url)
+        : historyRepo.getDuration(item.url);
+    
+    final bool isResuming = pos > 5000;
+
+    String playLabel = isResuming ? 'Resume' : 'Play';
+    if (targetEpisode != null && !state.isMovie) {
+      playLabel = "$playLabel S${targetEpisode.season} E${targetEpisode.episode}";
     }
 
     final playBtn = CustomButton(
@@ -103,7 +110,7 @@ class DetailsActionButtons extends ConsumerWidget {
               : [
                   const Icon(Icons.play_arrow_rounded),
                   const SizedBox(width: LayoutConstants.spacingXs),
-                  Text(isResuming ? 'Resume' : 'Play'),
+                  Text(playLabel),
                 ],
         ),
       ),
@@ -130,17 +137,60 @@ class DetailsActionButtons extends ConsumerWidget {
       ),
     );
 
-    if (vertical) {
-      return Column(
-        children: [playBtn, const SizedBox(height: LayoutConstants.spacingSm), downloadBtn],
+    Widget progressWidget = const SizedBox.shrink();
+    if (pos > 0 && dur > 0) {
+      final progress = (pos / dur).clamp(0.0, 1.0);
+      progressWidget = Padding(
+        padding: const EdgeInsets.only(top: 8.0, bottom: 4.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(2),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 4,
+                backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.primary),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              "${(progress * 100).toInt()}% watched${!state.isMovie && targetEpisode != null ? ' (S${targetEpisode.season} E${targetEpisode.episode})' : ''}",
+              style: TextStyle(
+                fontSize: 10,
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
       );
     }
 
-    return Row(
+    if (vertical) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          playBtn,
+          progressWidget,
+          const SizedBox(height: LayoutConstants.spacingSm),
+          downloadBtn,
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(child: playBtn),
-        const SizedBox(width: LayoutConstants.spacingSm),
-        Expanded(child: downloadBtn),
+        Row(
+          children: [
+            Expanded(child: playBtn),
+            const SizedBox(width: LayoutConstants.spacingSm),
+            Expanded(child: downloadBtn),
+          ],
+        ),
+        progressWidget,
       ],
     );
   }
@@ -176,82 +226,18 @@ class DetailsDesktopEpisodeGrid extends ConsumerWidget {
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 300,
+            maxCrossAxisExtent: 320,
             mainAxisSpacing: 16,
             crossAxisSpacing: 16,
-            childAspectRatio: 3 / 1, // Wider layout for episode cards
+            childAspectRatio: 1.1,
           ),
           itemCount: episodes.length,
           itemBuilder: (context, index) {
             final ep = episodes[index];
-            return Card(
-              key: ValueKey(ep.url),
-              margin: EdgeInsets.zero,
-              child: InkWell(
-                onTap: () => ref
-                    .read(detailsControllerProvider(parentItem.url).notifier)
-                    .handlePlayPress(context, parentItem, specificEpisode: ep),
-                borderRadius: BorderRadius.circular(12),
-                child: Padding(
-                  padding: const EdgeInsets.all(LayoutConstants.spacingXs),
-                  child: Row(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: CachedNetworkImage(
-                                imageUrl: AppImageFallbacks.poster(
-                                  ep.posterUrl,
-                                  label: ep.name.isNotEmpty
-                                      ? ep.name
-                                      : 'Episode ${ep.episode}',
-                                ),
-                                width: 80,
-                                height: 60,
-                                fit: BoxFit.cover,
-                                errorWidget: (_, _, _) => ThumbnailErrorPlaceholder(
-                                  label: ep.name.isNotEmpty
-                                      ? ep.name
-                                      : 'Episode ${ep.episode}',
-                                  iconSize: 24,
-                                ),
-                              ),
-                      ),
-                      const SizedBox(width: LayoutConstants.spacingSm),
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              ep.name.isNotEmpty
-                                  ? ep.name
-                                  : "Episode ${ep.episode}",
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodyLarge
-                                  ?.copyWith(fontWeight: FontWeight.w500),
-                            ),
-                            if (ep.description != null)
-                              Text(
-                                ep.description!,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                          ],
-                        ),
-                      ),
-                      state.isLaunching
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.play_circle_outline),
-                    ],
-                  ),
-                ),
-              ),
+            return EpisodeCard(
+              episode: ep,
+              parentItem: parentItem,
+              isHorizontal: true,
             );
           },
         ),
@@ -293,42 +279,10 @@ class DetailsEpisodeList extends ConsumerWidget {
           itemCount: episodes.length,
           itemBuilder: (context, index) {
             final ep = episodes[index];
-            return Card(
-              key: ValueKey(ep.url),
-              margin: const EdgeInsets.only(bottom: LayoutConstants.spacingXs),
-              child: ListTile(
-                leading: CachedNetworkImage(
-                  imageUrl: AppImageFallbacks.poster(
-                    ep.posterUrl,
-                    label: ep.name.isNotEmpty
-                        ? ep.name
-                        : 'Episode ${ep.episode}',
-                  ),
-                  width: 80,
-                  fit: BoxFit.cover,
-                  errorWidget: (_, _, _) =>
-                      ThumbnailErrorPlaceholder(
-                        label: ep.name.isNotEmpty
-                            ? ep.name
-                            : 'Episode ${ep.episode}',
-                        iconSize: 32,
-                      ),
-                ),
-                title: Text(
-                  ep.name.isNotEmpty ? ep.name : "Episode ${ep.episode}",
-                ),
-                subtitle: Text(ep.description ?? ""),
-                trailing: state.isLaunching
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.play_circle_outline),
-                onTap: () => ref
-                    .read(detailsControllerProvider(parentItem.url).notifier)
-                    .handlePlayPress(context, parentItem, specificEpisode: ep),
-              ),
+            return EpisodeCard(
+              episode: ep,
+              parentItem: parentItem,
+              isHorizontal: false,
             );
           },
         ),

@@ -92,7 +92,9 @@ class StorageService {
           posterUrl: map['posterUrl'] ?? '',
           bannerUrl: map['bannerUrl'],
           description: map['description'],
-          contentType: MultimediaItem.parseContentType(map['type'] ?? map['contentType']),
+          contentType: MultimediaItem.parseContentType(
+            map['type'] ?? map['contentType'],
+          ),
           provider: map['provider'],
         ),
       );
@@ -184,7 +186,8 @@ class StorageService {
   }
 
   bool isWatchHistoryEnabled() {
-    return _settingsBox.get('watch_history_enabled', defaultValue: true) ?? true;
+    return _settingsBox.get('watch_history_enabled', defaultValue: true) ??
+        true;
   }
 
   // --- Player Settings ---
@@ -215,7 +218,7 @@ class StorageService {
     int? episode,
     String? episodeTitle,
   }) async {
-    await _historyBox.put(_getKey(item.url), {
+    final entry = {
       'title': item.title,
       'url': item.url,
       'posterUrl': item.posterUrl,
@@ -231,11 +234,37 @@ class StorageService {
       'episode': episode,
       'episodeTitle': episodeTitle,
       'timestamp': DateTime.now().millisecondsSinceEpoch,
-    });
+    };
+
+    // Save main entry (keyed by series/movie URL)
+    await _historyBox.put(_getKey(item.url), entry);
+
+    // If it's a series and we have an episode URL, save an episode-specific entry
+    if (item.contentType == MultimediaContentType.series && lastEpisodeUrl != null) {
+      final episodeKey = "EP_${_getKey(lastEpisodeUrl)}";
+      await _historyBox.put(episodeKey, entry);
+    }
   }
 
   Future<void> removeFromHistory(String url) async {
-    await _historyBox.delete(_getKey(url));
+    final mainKey = _getKey(url);
+    await _historyBox.delete(mainKey);
+
+    // Cascade delete: find and remove all EP_ entries for this series
+    final keysToDelete = <String>[];
+    for (var i = 0; i < _historyBox.length; i++) {
+      final key = _historyBox.keyAt(i) as String;
+      if (key.startsWith("EP_")) {
+        final entry = _historyBox.get(key);
+        if (entry != null && entry['url'] == url) {
+          keysToDelete.add(key);
+        }
+      }
+    }
+
+    for (final k in keysToDelete) {
+      await _historyBox.delete(k);
+    }
   }
 
   Future<void> clearAllHistory() async {
@@ -245,7 +274,10 @@ class StorageService {
   List<Map<String, dynamic>> getWatchHistory() {
     final items = <Map<String, dynamic>>[];
     for (var i = 0; i < _historyBox.length; i++) {
-      final key = _historyBox.keyAt(i);
+      final key = _historyBox.keyAt(i) as String;
+      // Filter out episode-specific entries from the main history list
+      if (key.startsWith("EP_")) continue;
+      
       final map = Map<String, dynamic>.from(_historyBox.get(key));
       items.add(map);
     }
@@ -257,10 +289,51 @@ class StorageService {
   }
 
   int getPosition(String url) {
+    // Check main entry first (movies use this)
     final key = _getKey(url);
     if (_historyBox.containsKey(key)) {
       final map = _historyBox.get(key);
       return map['position'] ?? 0;
+    }
+
+    // Fallback to episode if applicable (for legacy or mixed lookups)
+    final epKey = "EP_${_getKey(url)}";
+    if (_historyBox.containsKey(epKey)) {
+      final map = _historyBox.get(epKey);
+      return map['position'] ?? 0;
+    }
+    return 0;
+  }
+
+  int getEpisodePosition(String epUrl) {
+    final epKey = "EP_${_getKey(epUrl)}";
+    if (_historyBox.containsKey(epKey)) {
+      final map = _historyBox.get(epKey);
+      return map['position'] ?? 0;
+    }
+    return 0;
+  }
+
+  int getDuration(String url) {
+    final key = _getKey(url);
+    if (_historyBox.containsKey(key)) {
+      final map = _historyBox.get(key);
+      return map['duration'] ?? 0;
+    }
+
+    final epKey = "EP_${_getKey(url)}";
+    if (_historyBox.containsKey(epKey)) {
+      final map = _historyBox.get(epKey);
+      return map['duration'] ?? 0;
+    }
+    return 0;
+  }
+
+  int getEpisodeDuration(String epUrl) {
+    final epKey = "EP_${_getKey(epUrl)}";
+    if (_historyBox.containsKey(epKey)) {
+      final map = _historyBox.get(epKey);
+      return map['duration'] ?? 0;
     }
     return 0;
   }

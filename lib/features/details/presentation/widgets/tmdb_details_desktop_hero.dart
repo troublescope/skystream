@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../shared/widgets/thumbnail_error_placeholder.dart';
 import '../../../../core/models/tmdb_details.dart';
+import '../../../../core/storage/history_repository.dart';
 import 'provider_search_section.dart';
 
 /// Desktop hero: backdrop, gradients, and first column (logo, metadata, overview, sources).
 /// [child] is the rest of the scroll content (seasons, cast, trailers, stats, etc.).
-class TmdbDetailsDesktopHero extends StatelessWidget {
+class TmdbDetailsDesktopHero extends ConsumerWidget {
   const TmdbDetailsDesktopHero({
     super.key,
     required this.data,
@@ -19,7 +21,7 @@ class TmdbDetailsDesktopHero extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final scaffoldColor = theme.scaffoldBackgroundColor;
     final textColor = theme.colorScheme.onSurface;
@@ -128,7 +130,50 @@ class TmdbDetailsDesktopHero extends StatelessWidget {
                             height: 1.1,
                           ),
                         ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 12),
+                      Consumer(
+                        builder: (context, ref, _) {
+                          final historyRepo = ref.watch(historyRepositoryProvider);
+                          final pos = historyRepo.getPosition(data.id.toString());
+                          final dur = historyRepo.getDuration(data.id.toString());
+
+                          if (pos > 0 && dur > 0) {
+                            final progress = (pos / dur).clamp(0.0, 1.0);
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: 400,
+                                  height: 6,
+                                  clipBehavior: Clip.antiAlias,
+                                  decoration: BoxDecoration(
+                                    color: textColor.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                  child: LinearProgressIndicator(
+                                    value: progress,
+                                    backgroundColor: Colors.transparent,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      theme.colorScheme.primary,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  "${(progress * 100).toInt()}% watched",
+                                  style: TextStyle(
+                                    color: theme.colorScheme.primary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            );
+                          }
+                          return const SizedBox.shrink();
+                        },
+                      ),
+                      const SizedBox(height: 12),
                       Wrap(
                         spacing: 12,
                         runSpacing: 8,

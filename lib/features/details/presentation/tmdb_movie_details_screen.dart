@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/models/tmdb_details.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/storage/history_repository.dart';
 
 import 'widgets/provider_search_section.dart';
 import '../../../../core/utils/responsive_breakpoints.dart';
@@ -136,7 +137,11 @@ class _TmdbMovieDetailsScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ShimmerPlaceholder.rectangular(height: 200, width: double.infinity, borderRadius: 12),
+                  ShimmerPlaceholder.rectangular(
+                    height: 200,
+                    width: double.infinity,
+                    borderRadius: 12,
+                  ),
                   const SizedBox(height: 24),
                   Row(
                     children: [
@@ -146,9 +151,17 @@ class _TmdbMovieDetailsScreenState
                     ],
                   ),
                   const SizedBox(height: 16),
-                  ShimmerPlaceholder.rectangular(height: 30, width: 250, borderRadius: 6),
+                  ShimmerPlaceholder.rectangular(
+                    height: 30,
+                    width: 250,
+                    borderRadius: 6,
+                  ),
                   const SizedBox(height: 16),
-                  ShimmerPlaceholder.rectangular(height: 100, width: double.infinity, borderRadius: 12),
+                  ShimmerPlaceholder.rectangular(
+                    height: 100,
+                    width: double.infinity,
+                    borderRadius: 12,
+                  ),
                 ],
               ),
             ),
@@ -233,10 +246,7 @@ class _TmdbMovieDetailsScreenState
               ),
             ],
             if (trailers.isNotEmpty) ...[
-              MovieTrailersCarousel(
-                trailers: trailers,
-                textColor: textColor,
-              ),
+              MovieTrailersCarousel(trailers: trailers, textColor: textColor),
             ],
             if (productionCompanies.isNotEmpty) ...[
               MovieProductionCompanies(
@@ -346,8 +356,10 @@ class _TmdbMovieDetailsScreenState
                             context,
                           ).colorScheme.surfaceContainerHighest,
                         ),
-                        errorWidget: (_, _, _) =>
-                            ThumbnailErrorPlaceholder(label: title, isBackdrop: true),
+                        errorWidget: (_, _, _) => ThumbnailErrorPlaceholder(
+                          label: title,
+                          isBackdrop: true,
+                        ),
                       ),
                     ),
                     Container(
@@ -356,13 +368,15 @@ class _TmdbMovieDetailsScreenState
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: [
-                            Theme.of(context).scaffoldBackgroundColor
-                                .withValues(alpha: 0.0),
                             Theme.of(
                               context,
                             ).scaffoldBackgroundColor.withValues(alpha: 0.0),
-                            Theme.of(context).scaffoldBackgroundColor
-                                .withValues(alpha: 0.8),
+                            Theme.of(
+                              context,
+                            ).scaffoldBackgroundColor.withValues(alpha: 0.0),
+                            Theme.of(
+                              context,
+                            ).scaffoldBackgroundColor.withValues(alpha: 0.8),
                             Theme.of(context).scaffoldBackgroundColor,
                           ],
                           stops: const [0.0, 0.4, 0.8, 1.0],
@@ -394,7 +408,9 @@ class _TmdbMovieDetailsScreenState
                                           title.toUpperCase(),
                                           textAlign: TextAlign.center,
                                           style: TextStyle(
-                                            color: Theme.of(context).colorScheme.onSurface,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurface,
                                             fontSize: 40,
                                             fontFamily: 'RobotoCondensed',
                                             fontWeight: FontWeight.w900,
@@ -413,7 +429,9 @@ class _TmdbMovieDetailsScreenState
                                           title.toUpperCase(),
                                           textAlign: TextAlign.center,
                                           style: TextStyle(
-                                            color: Theme.of(context).colorScheme.onSurface,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurface,
                                             fontSize: 40,
                                             fontFamily: 'RobotoCondensed',
                                             fontWeight: FontWeight.w900,
@@ -477,7 +495,56 @@ class _TmdbMovieDetailsScreenState
                   query: title,
                   parentMediaType: isMovie ? 'movie' : 'tv',
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
+                Consumer(
+                  builder: (context, ref, _) {
+                    final historyRepo = ref.watch(historyRepositoryProvider);
+                    final pos = historyRepo.getPosition(data.id.toString());
+                    final dur = historyRepo.getDuration(data.id.toString());
+
+                    if (pos > 0 && dur > 0) {
+                      final progress = (pos / dur).clamp(0.0, 1.0);
+                      final theme = Theme.of(context);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 24.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: double.infinity,
+                              height: 6,
+                              clipBehavior: Clip.antiAlias,
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.onSurface.withValues(
+                                  alpha: 0.1,
+                                ),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                              child: LinearProgressIndicator(
+                                value: progress,
+                                backgroundColor: Colors.transparent,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  theme.colorScheme.primary,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              "${(progress * 100).toInt()}% watched",
+                              style: TextStyle(
+                                color: theme.colorScheme.primary,
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+                const SizedBox(height: 8),
 
                 // Metadata Row: [TMDB] MOVIE/TV  2026  1H 56M  [PG-13]
                 Wrap(
@@ -488,13 +555,26 @@ class _TmdbMovieDetailsScreenState
                     _buildTmdbLogo(),
                     _buildTopBadge(context, isMovie ? "MOVIE" : "TV SHOW"),
                     _buildIconInfo(context, Icons.calendar_today_rounded, year),
-                    _buildIconInfo(context, Icons.star_rounded, rating, iconColor: const Color(0xFF01B4E4)),
+                    _buildIconInfo(
+                      context,
+                      Icons.star_rounded,
+                      rating,
+                      iconColor: const Color(0xFF01B4E4),
+                    ),
                     if (runtime > 0)
-                      _buildIconInfo(context, Icons.timer_outlined, durationText),
+                      _buildIconInfo(
+                        context,
+                        Icons.timer_outlined,
+                        durationText,
+                      ),
                     if (certification.isNotEmpty)
                       _buildBorderedInfo(context, certification),
                     if (!isMovie && data.seasons.isNotEmpty)
-                      _buildIconInfo(context, Icons.layers_rounded, "${data.seasons.length} Seasons"),
+                      _buildIconInfo(
+                        context,
+                        Icons.layers_rounded,
+                        "${data.seasons.length} Seasons",
+                      ),
                   ],
                 ),
 
@@ -692,20 +772,29 @@ class _TmdbMovieDetailsScreenState
     );
   }
 
-  Widget _buildIconInfo(BuildContext context, IconData icon, String text, {Color? iconColor}) {
+  Widget _buildIconInfo(
+    BuildContext context,
+    IconData icon,
+    String text, {
+    Color? iconColor,
+  }) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(
           icon,
           size: 14,
-          color: iconColor ?? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+          color:
+              iconColor ??
+              Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
         ),
         const SizedBox(width: 4),
         Text(
           text,
           style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.8),
             fontSize: 14,
             fontWeight: FontWeight.bold,
           ),
@@ -718,7 +807,9 @@ class _TmdbMovieDetailsScreenState
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         border: Border.all(
           color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
         ),

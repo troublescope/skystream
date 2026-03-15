@@ -13,6 +13,7 @@ import '../../../../core/extensions/base_provider.dart';
 import '../../../../core/extensions/extension_manager.dart';
 import '../../../../core/extensions/providers.dart';
 import '../../../../core/models/torrent_status.dart';
+import '../../../../core/storage/history_repository.dart';
 import '../../library/presentation/history_provider.dart';
 import '../../settings/presentation/player_settings_provider.dart';
 
@@ -298,17 +299,28 @@ class PlayerController extends Notifier<PlayerState> {
 
   int _findSavedStreamIndex(List<StreamResult> streams) {
     try {
-      final historyList = ref.read(watchHistoryProvider);
-      final previousState = historyList.firstWhere(
-        (h) => h.item.url == _item.url,
-        orElse: () => HistoryItem(
-          item: _item,
-          position: 0,
-          duration: 0,
-          timestamp: DateTime.now().millisecondsSinceEpoch,
-        ),
-      );
-      final lastUrl = previousState.lastStreamUrl;
+      final historyRepo = ref.read(historyRepositoryProvider);
+      final isSeries = _item.contentType == MultimediaContentType.series;
+      
+      String? lastUrl;
+      if (isSeries) {
+        lastUrl = historyRepo.getLastStreamUrl(_videoUrl);
+      }
+      
+      if (lastUrl == null) {
+        final historyList = ref.read(watchHistoryProvider);
+        final previousState = historyList.firstWhere(
+          (h) => h.item.url == _item.url,
+          orElse: () => HistoryItem(
+            item: _item,
+            position: 0,
+            duration: 0,
+            timestamp: DateTime.now().millisecondsSinceEpoch,
+          ),
+        );
+        lastUrl = previousState.lastStreamUrl;
+      }
+
       if (lastUrl != null) {
         final foundIndex = streams.indexWhere((s) => s.url == lastUrl);
         if (foundIndex != -1) return foundIndex;
@@ -356,18 +368,15 @@ class PlayerController extends Notifier<PlayerState> {
 
       await _player.open(Media(playUrl, httpHeaders: headers));
 
-      final historyList = ref.read(watchHistoryProvider);
-      final savedPos = historyList
-          .firstWhere(
-            (h) => h.item.url == _item.url,
-            orElse: () => HistoryItem(
-              item: _item,
-              position: 0,
-              duration: 0,
-              timestamp: DateTime.now().millisecondsSinceEpoch,
-            ),
-          )
-          .position;
+      final historyRepo = ref.read(historyRepositoryProvider);
+      final isSeries = _item.contentType == MultimediaContentType.series;
+      
+      int savedPos = 0;
+      if (isSeries) {
+        savedPos = historyRepo.getEpisodePosition(_videoUrl);
+      } else {
+        savedPos = historyRepo.getPosition(_item.url);
+      }
 
       if (savedPos > 0) {
         await _safeSeekTo(savedPos);

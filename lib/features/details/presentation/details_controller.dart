@@ -16,6 +16,7 @@ class DetailsState {
   final bool isMovie;
   final MultimediaItem? item;
   final bool isLaunching;
+  final Episode? targetEpisode;
 
   const DetailsState({
     this.details = const AsyncLoading(),
@@ -24,6 +25,7 @@ class DetailsState {
     this.isMovie = false,
     this.item,
     this.isLaunching = false,
+    this.targetEpisode,
   });
 
   DetailsState copyWith({
@@ -33,6 +35,7 @@ class DetailsState {
     bool? isMovie,
     MultimediaItem? item,
     bool? isLaunching,
+    Episode? targetEpisode,
   }) {
     return DetailsState(
       details: details ?? this.details,
@@ -41,6 +44,7 @@ class DetailsState {
       isMovie: isMovie ?? this.isMovie,
       item: item ?? this.item,
       isLaunching: isLaunching ?? this.isLaunching,
+      targetEpisode: targetEpisode ?? this.targetEpisode,
     );
   }
 }
@@ -51,6 +55,12 @@ class DetailsController extends Notifier<DetailsState> {
 
   @override
   DetailsState build() {
+    ref.listen(watchHistoryProvider, (prev, next) {
+      final details = state.details.asData?.value;
+      if (details != null) {
+        _processEpisodes(details.episodes, details, isInitial: false);
+      }
+    });
     return const DetailsState();
   }
 
@@ -125,8 +135,8 @@ class DetailsController extends Notifier<DetailsState> {
         final fetchedItem = await provider.getDetails(item.url);
         final withProvider = fetchedItem.copyWith(provider: provider.packageName);
 
-        _processEpisodes(withProvider.episodes, withProvider);
-        state = state.copyWith(details: AsyncData(withProvider));
+      _processEpisodes(withProvider.episodes, withProvider, isInitial: true);
+      state = state.copyWith(details: AsyncData(withProvider));
       } else {
         throw Exception("No provider selected or found for this item");
       }
@@ -135,7 +145,7 @@ class DetailsController extends Notifier<DetailsState> {
     }
   }
 
-  void _processEpisodes(List<Episode>? episodes, MultimediaItem contextItem) {
+  void _processEpisodes(List<Episode>? episodes, MultimediaItem contextItem, {bool isInitial = false}) {
     // Determine isMovie based on contentType if available
     bool isMovie = contextItem.contentType == MultimediaContentType.movie ||
                    contextItem.contentType == MultimediaContentType.livestream;
@@ -166,12 +176,49 @@ class DetailsController extends Notifier<DetailsState> {
     }
 
     final sortedSeasons = seasonMap.keys.toList()..sort();
-    final selectedSeason = sortedSeasons.isNotEmpty ? sortedSeasons.first : 1;
+    int selectedSeason = sortedSeasons.isNotEmpty ? sortedSeasons.first : 1;
+    Episode? targetEpisode;
+
+    final historyRepo = ref.read(historyRepositoryProvider);
+
+    // Find target episode and auto-select season
+    final allEpisodes = episodes;
+    final lastEpisodeUrl = historyRepo.getLastEpisodeUrl(contextItem.url);
+
+    if (lastEpisodeUrl != null) {
+      final lastIndex = allEpisodes.indexWhere((e) => e.url == lastEpisodeUrl);
+      if (lastIndex != -1) {
+        final pos = historyRepo.getEpisodePosition(lastEpisodeUrl);
+        final dur = historyRepo.getEpisodeDuration(lastEpisodeUrl);
+        final progress = dur > 0 ? pos / dur : 0;
+
+        if (progress > 0.98) {
+          if (lastIndex + 1 < allEpisodes.length) {
+            targetEpisode = allEpisodes[lastIndex + 1];
+          } else {
+            targetEpisode = allEpisodes[lastIndex]; // Stay on last if finished
+          }
+        } else {
+          targetEpisode = allEpisodes[lastIndex];
+        }
+      }
+    }
+
+    targetEpisode ??= allEpisodes.first;
+
+    // Auto-select season based on target episode ONLY if initial load 
+    // or if we haven't manually switched seasons yet (using state.selectedSeason as 1 as a weak hint)
+    if (isInitial && targetEpisode.season > 0) {
+      selectedSeason = targetEpisode.season;
+    } else {
+      selectedSeason = state.selectedSeason;
+    }
 
     state = state.copyWith(
       isMovie: false,
       seasonMap: seasonMap,
       selectedSeason: selectedSeason,
+      targetEpisode: targetEpisode,
     );
   }
 
@@ -208,53 +255,11 @@ class DetailsController extends Notifier<DetailsState> {
       return;
     }
 
-    final historyRepo = ref.read(historyRepositoryProvider);
-    final lastEpisodeUrl = historyRepo.getLastEpisodeUrl(details.url);
-    final position = historyRepo.getPosition(details.url);
-    final historyHistory = ref.read(watchHistoryProvider);
-    final duration = historyHistory
-        .firstWhere(
-          (i) => i.item.url == details.url,
-          orElse: () => HistoryItem(
-            item: details,
-            position: 0,
-            duration: 1,
-            timestamp: 0,
-          ),
-        )
-        .duration;
-
-    final progress = duration > 0 ? (position / duration) * 100 : 0;
-
-    if (lastEpisodeUrl != null) {
-      final allEpisodes = <Episode>[];
-      final sortedSeasons = state.seasonMap.keys.toList()..sort();
-      for (var s in sortedSeasons) {
-        allEpisodes.addAll(state.seasonMap[s]!);
-      }
-
-      final lastIndex = allEpisodes.indexWhere((e) => e.url == lastEpisodeUrl);
-      if (lastIndex != -1) {
-        // We rely on PlayerController having already advanced the history to the next 
-        // episode if the previous one was completed. But as a safety fallback, 
-        // we check progress here too.
-        if (progress >= 98) {
-          if (lastIndex + 1 < allEpisodes.length) {
-            ref
-                .read(playbackLauncherProvider)
-                .play(
-                  context,
-                  allEpisodes[lastIndex + 1].url,
-                  baseItem: details,
-                );
-            return;
-          }
-        }
-        ref
-            .read(playbackLauncherProvider)
-            .play(context, lastEpisodeUrl, baseItem: details);
-        return;
-      }
+    if (state.targetEpisode != null) {
+      ref
+          .read(playbackLauncherProvider)
+          .play(context, state.targetEpisode!.url, baseItem: details);
+      return;
     }
 
     final firstSeason = state.seasonMap.keys.toList()..sort();
