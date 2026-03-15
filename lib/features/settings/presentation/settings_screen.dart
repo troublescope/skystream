@@ -8,6 +8,7 @@ import 'widgets/settings_widgets.dart';
 import 'widgets/settings_dialogs.dart';
 import 'package:go_router/go_router.dart';
 import 'player_settings_provider.dart';
+import 'general_settings_provider.dart';
 
 import '../../../core/network/doh_service.dart';
 
@@ -24,6 +25,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final versionAsync = ref.watch(appVersionProvider);
     final themeMode = ref.watch(themeModeProvider);
+    final generalSettings = ref.watch(generalSettingsProvider);
 
     final playerSettings =
         ref.watch(playerSettingsProvider).asData?.value ??
@@ -47,8 +49,24 @@ class SettingsScreen extends ConsumerWidget {
                     subtitle: themeMode == ThemeMode.system
                         ? 'System'
                         : (themeMode == ThemeMode.dark ? 'Dark' : 'Light'),
-                    isLast: true,
                     onTap: () => showThemeDialog(context, ref, themeMode),
+                  ),
+                  SettingsTile(
+                    icon: Icons.history_rounded,
+                    title: 'Record Watch History',
+                    subtitle: generalSettings.watchHistoryEnabled
+                        ? 'Enabled'
+                        : 'Disabled',
+                    trailing: Switch(
+                      value: generalSettings.watchHistoryEnabled,
+                      onChanged: (val) => ref
+                          .read(generalSettingsProvider.notifier)
+                          .setWatchHistoryEnabled(val),
+                    ),
+                    isLast: true,
+                    onTap: () => ref
+                        .read(generalSettingsProvider.notifier)
+                        .setWatchHistoryEnabled(!generalSettings.watchHistoryEnabled),
                   ),
                 ],
               ),

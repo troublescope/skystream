@@ -347,7 +347,7 @@ class _TmdbMovieDetailsScreenState
                           ).colorScheme.surfaceContainerHighest,
                         ),
                         errorWidget: (_, _, _) =>
-                            const ThumbnailErrorPlaceholder(),
+                            ThumbnailErrorPlaceholder(label: title, isBackdrop: true),
                       ),
                     ),
                     Container(
@@ -390,6 +390,17 @@ class _TmdbMovieDetailsScreenState
                                         width: 280,
                                         height: 120,
                                         fit: BoxFit.contain,
+                                        placeholderBuilder: (_) => Text(
+                                          title.toUpperCase(),
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: Theme.of(context).colorScheme.onSurface,
+                                            fontSize: 40,
+                                            fontFamily: 'RobotoCondensed',
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 1.0,
+                                          ),
+                                        ),
                                       )
                                     else
                                       CachedNetworkImage(
@@ -398,6 +409,17 @@ class _TmdbMovieDetailsScreenState
                                         height: 120,
                                         fit: BoxFit.contain,
                                         alignment: Alignment.center,
+                                        errorWidget: (_, _, _) => Text(
+                                          title.toUpperCase(),
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: Theme.of(context).colorScheme.onSurface,
+                                            fontSize: 40,
+                                            fontFamily: 'RobotoCondensed',
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 1.0,
+                                          ),
+                                        ),
                                       ),
                                   ] else
                                     Text(

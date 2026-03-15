@@ -4,6 +4,7 @@ import 'package:skystream/core/domain/entity/multimedia_item.dart';
 import 'package:skystream/core/utils/image_fallbacks.dart';
 import 'package:intl/intl.dart';
 import 'package:skystream/shared/widgets/shimmer_placeholder.dart';
+import 'package:skystream/shared/widgets/thumbnail_error_placeholder.dart';
 import 'details_layout_widgets.dart';
 
 class MetadataBar extends StatelessWidget {
@@ -453,6 +454,9 @@ class RecommendationsCarousel extends StatelessWidget {
                             ),
                             fit: BoxFit.cover,
                             width: 110,
+                            errorWidget: (_, _, _) => ThumbnailErrorPlaceholder(
+                              label: item.title,
+                            ),
                           ),
                         ),
                       ),

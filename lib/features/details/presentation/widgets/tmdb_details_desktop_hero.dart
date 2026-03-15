@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../../shared/widgets/thumbnail_error_placeholder.dart';
 import '../../../../core/models/tmdb_details.dart';
 import 'provider_search_section.dart';
 
@@ -57,6 +58,8 @@ class TmdbDetailsDesktopHero extends StatelessWidget {
               imageUrl: backdropImageUrl,
               fit: BoxFit.cover,
               alignment: Alignment.centerRight,
+              errorWidget: (_, _, _) =>
+                  ThumbnailErrorPlaceholder(label: title, isBackdrop: true),
             ),
           ),
         ),

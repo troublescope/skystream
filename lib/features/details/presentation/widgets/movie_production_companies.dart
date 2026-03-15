@@ -103,7 +103,17 @@ class _MovieProductionCompaniesState extends State<MovieProductionCompanies> {
         height: 20, // Reduced for TV
         fit: BoxFit.contain,
         placeholder: (_, _) => const SizedBox(width: 20, height: 20),
-        errorWidget: (_, _, _) => const Icon(Icons.error, size: 20),
+        errorWidget: (_, _, _) => Center(
+          child: Text(
+            c.name,
+            style: const TextStyle(
+              color: Colors.black,
+              fontSize: 8,
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
       ),
     );
   }
@@ -122,7 +132,17 @@ class _MovieProductionCompaniesState extends State<MovieProductionCompanies> {
         fit: BoxFit.contain,
         width: 100,
         placeholder: (_, _) => const SizedBox.shrink(),
-        errorWidget: (_, _, _) => const SizedBox.shrink(),
+        errorWidget: (_, _, _) => Center(
+          child: Text(
+            company.name,
+            style: const TextStyle(
+              color: Colors.black,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
       ),
     );
   }

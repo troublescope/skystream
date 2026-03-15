@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'home_provider.dart';
 import 'package:skystream/features/home/presentation/widgets/continue_watching_section.dart';
 import 'package:skystream/features/library/presentation/history_provider.dart';
+import '../../settings/presentation/general_settings_provider.dart';
 import '../../discover/presentation/widgets/discover_carousel.dart';
 import '../../discover/presentation/widgets/media_horizontal_list.dart';
 import '../../discover/presentation/view_all_screen.dart';
@@ -74,6 +75,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     super.build(context); // Required for AutomaticKeepAliveClientMixin
     final homeDataAsync = ref.watch(homeDataProvider);
     final history = ref.watch(watchHistoryProvider);
+    final generalSettings = ref.watch(generalSettingsProvider);
 
     return ValueListenableBuilder<bool>(
       valueListenable: _isScrolledNotifier,
@@ -191,7 +193,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               );
             },
           ),
-          body: _buildBody(context, homeDataAsync, history),
+          body: _buildBody(
+            context,
+            homeDataAsync,
+            history,
+            generalSettings.watchHistoryEnabled,
+          ),
         );
       },
     );
@@ -201,6 +208,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     BuildContext context,
     AsyncValue<Map<String, List<dynamic>>> homeDataAsync,
     List<dynamic> history,
+    bool watchHistoryEnabled,
   ) {
     // Handling initial loading
     final isResolving = ref.watch(providerResolutionLoadingProvider);
@@ -291,7 +299,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 ),
 
               // Continue Watching
-              if (history.isNotEmpty)
+              if (watchHistoryEnabled && history.isNotEmpty)
                 SliverToBoxAdapter(
                   child: ContinueWatchingSection(
                     title: 'Continue Watching',

@@ -208,6 +208,12 @@ class DetailsDesktopEpisodeGrid extends ConsumerWidget {
                                 width: 80,
                                 height: 60,
                                 fit: BoxFit.cover,
+                                errorWidget: (_, _, _) => ThumbnailErrorPlaceholder(
+                                  label: ep.name.isNotEmpty
+                                      ? ep.name
+                                      : 'Episode ${ep.episode}',
+                                  iconSize: 24,
+                                ),
                               ),
                       ),
                       const SizedBox(width: LayoutConstants.spacingSm),
@@ -301,7 +307,12 @@ class DetailsEpisodeList extends ConsumerWidget {
                   width: 80,
                   fit: BoxFit.cover,
                   errorWidget: (_, _, _) =>
-                      const ThumbnailErrorPlaceholder(iconSize: 32),
+                      ThumbnailErrorPlaceholder(
+                        label: ep.name.isNotEmpty
+                            ? ep.name
+                            : 'Episode ${ep.episode}',
+                        iconSize: 32,
+                      ),
                 ),
                 title: Text(
                   ep.name.isNotEmpty ? ep.name : "Episode ${ep.episode}",

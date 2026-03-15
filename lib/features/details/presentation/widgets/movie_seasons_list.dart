@@ -195,6 +195,8 @@ class _MovieSeasonsListState extends ConsumerState<MovieSeasonsList> {
                                   imageUrl: season.posterImageUrl,
                                   fit: BoxFit.cover,
                                   width: double.infinity,
+                                  errorWidget: (_, _, _) =>
+                                      ThumbnailErrorPlaceholder(label: season.name),
                                 ),
                               ),
                             ),
@@ -324,8 +326,9 @@ class _MovieSeasonsListState extends ConsumerState<MovieSeasonsList> {
                                 width: double.infinity,
                                 placeholder: (context, url) =>
                                     ShimmerPlaceholder.rectangular(borderRadius: 8),
-                                errorWidget: (_, _, _) =>
-                                    const ThumbnailErrorPlaceholder(),
+                                errorWidget: (_, _, _) => ThumbnailErrorPlaceholder(
+                                  label: ep['name'] ?? 'Episode',
+                                ),
                               ),
                             ),
                             Padding(
@@ -485,16 +488,17 @@ class _MovieSeasonsListState extends ConsumerState<MovieSeasonsList> {
                         padding: const EdgeInsets.only(bottom: 8),
                         child: Row(
                           children: [
-                            Container(
-                              width: 120,
-                              height: 68,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(8),
-                                image: DecorationImage(
-                                  image: NetworkImage(imageUrl),
-                                  fit: BoxFit.cover,
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: CachedNetworkImage(
+                                imageUrl: imageUrl,
+                                width: 120,
+                                height: 68,
+                                fit: BoxFit.cover,
+                                errorWidget: (_, _, _) => ThumbnailErrorPlaceholder(
+                                  label: ep['name'] ?? 'Episode',
+                                  iconSize: 24,
                                 ),
-                                color: Colors.grey[800],
                               ),
                             ),
                             const SizedBox(width: 12),

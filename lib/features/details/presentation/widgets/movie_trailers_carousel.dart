@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../../../shared/widgets/thumbnail_error_placeholder.dart';
 import '../../../../shared/widgets/cards_wrapper.dart';
 import '../../../../shared/widgets/desktop_scroll_wrapper.dart';
 import '../../../../core/utils/responsive_breakpoints.dart';
@@ -134,23 +136,25 @@ class _MovieTrailersCarouselState extends State<MovieTrailersCarousel> {
       },
       child: AspectRatio(
         aspectRatio: 16 / 9,
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            image: DecorationImage(
-              image: NetworkImage(
-                'https://img.youtube.com/vi/$key/mqdefault.jpg',
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              CachedNetworkImage(
+                imageUrl: 'https://img.youtube.com/vi/$key/mqdefault.jpg',
+                fit: BoxFit.cover,
+                errorWidget: (_, _, _) => const ThumbnailErrorPlaceholder(),
               ),
-              fit: BoxFit.cover,
-            ),
-            color: Colors.black,
-          ),
-          child: const Center(
-            child: Icon(
-              Icons.play_circle_outline,
-              color: Colors.white,
-              size: 40,
-            ),
+              Container(color: Colors.black26),
+              const Center(
+                child: Icon(
+                  Icons.play_circle_outline,
+                  color: Colors.white,
+                  size: 40,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -171,41 +175,45 @@ class _MovieTrailersCarouselState extends State<MovieTrailersCarousel> {
       child: Container(
         width: 200,
         margin: const EdgeInsets.only(right: 16),
-        decoration: BoxDecoration(
+        child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          image: DecorationImage(
-            image: NetworkImage(thumbUrl),
-            fit: BoxFit.cover,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              CachedNetworkImage(
+                imageUrl: thumbUrl,
+                fit: BoxFit.cover,
+                errorWidget: (_, _, _) => ThumbnailErrorPlaceholder(label: video.name),
+              ),
+              Container(color: Colors.black26),
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(
+                    color: Colors.black54,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.play_arrow, color: Colors.white),
+                ),
+              ),
+              Positioned(
+                bottom: 8,
+                left: 8,
+                right: 8,
+                child: Text(
+                  video.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    shadows: [Shadow(color: Colors.black, blurRadius: 4)],
+                  ),
+                ),
+              ),
+            ],
           ),
-        ),
-        child: Stack(
-          children: [
-            Center(
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: const BoxDecoration(
-                  color: Colors.black54,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.play_arrow, color: Colors.white),
-              ),
-            ),
-            Positioned(
-              bottom: 8,
-              left: 8,
-              child: Text(
-                video.name,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  shadows: [Shadow(color: Colors.black, blurRadius: 4)],
-                ),
-              ),
-            ),
-          ],
         ),
       ),
     );

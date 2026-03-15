@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/storage/history_repository.dart';
 import '../../../../core/domain/entity/multimedia_item.dart';
+import '../../settings/presentation/general_settings_provider.dart';
 
 export '../../../../core/storage/history_repository.dart' show HistoryItem;
 
@@ -38,10 +39,18 @@ class WatchHistoryNotifier extends Notifier<List<HistoryItem>> {
     String? lastStreamUrl,
     String? lastEpisodeUrl,
   }) async {
+    final enabled = ref.read(generalSettingsProvider).watchHistoryEnabled;
+    if (!enabled) return;
+
+    // For livestreams, we don't save progress but we still want it in history
+    final isLivestream = item.contentType == MultimediaContentType.livestream;
+    final finalPosition = isLivestream ? 0 : position;
+    final finalDuration = isLivestream ? 0 : duration;
+
     await _repository.saveProgress(
       item,
-      position,
-      duration,
+      finalPosition,
+      finalDuration,
       lastStreamUrl: lastStreamUrl,
       lastEpisodeUrl: lastEpisodeUrl,
     );

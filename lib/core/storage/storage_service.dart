@@ -178,6 +178,15 @@ class StorageService {
     return _settingsBox.get('language', defaultValue: 'en-US');
   }
 
+  // --- Watch History Toggle ---
+  Future<void> setWatchHistoryEnabled(bool enabled) async {
+    await _settingsBox.put('watch_history_enabled', enabled);
+  }
+
+  bool isWatchHistoryEnabled() {
+    return _settingsBox.get('watch_history_enabled', defaultValue: true) ?? true;
+  }
+
   // --- Player Settings ---
   Future<void> setPlayerSetting(String key, dynamic value) async {
     await _settingsBox.put(key, value);

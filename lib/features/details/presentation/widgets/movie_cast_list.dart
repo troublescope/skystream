@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../../shared/widgets/thumbnail_error_placeholder.dart';
 import '../../../../shared/widgets/cards_wrapper.dart';
 import '../../../../shared/widgets/desktop_scroll_wrapper.dart';
 import '../../../../core/utils/responsive_breakpoints.dart';
@@ -96,9 +97,16 @@ class _MovieCastListState extends State<MovieCastList> {
       borderRadius: BorderRadius.circular(40),
       child: Column(
         children: [
-          CircleAvatar(
-            radius: 40,
-            backgroundImage: NetworkImage(actor.profileImageUrl),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(40),
+            child: CachedNetworkImage(
+              imageUrl: actor.profileImageUrl,
+              width: 80,
+              height: 80,
+              fit: BoxFit.cover,
+              errorWidget: (_, _, _) =>
+                  ThumbnailErrorPlaceholder(label: actor.name, iconSize: 30),
+            ),
           ),
           const SizedBox(height: 8),
           SizedBox(
@@ -136,11 +144,17 @@ class _MovieCastListState extends State<MovieCastList> {
         margin: const EdgeInsets.only(right: 16),
         child: Column(
           children: [
-            CircleAvatar(
-              radius: 35,
-              backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-              backgroundImage: CachedNetworkImageProvider(
-                member.profileImageUrl,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(35),
+              child: CachedNetworkImage(
+                imageUrl: member.profileImageUrl,
+                width: 70,
+                height: 70,
+                fit: BoxFit.cover,
+                errorWidget: (_, _, _) => ThumbnailErrorPlaceholder(
+                  label: member.name,
+                  iconSize: 30,
+                ),
               ),
             ),
             const SizedBox(height: 8),

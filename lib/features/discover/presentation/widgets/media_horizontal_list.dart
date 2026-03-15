@@ -207,7 +207,7 @@ class _MediaHorizontalListState extends State<MediaHorizontalList> {
                                 placeholder: (context, url) =>
                                     ShimmerPlaceholder(borderRadius: 12),
                                 errorWidget: (_, _, _) =>
-                                    const ThumbnailErrorPlaceholder(),
+                                    ThumbnailErrorPlaceholder(label: itemTitle),
                               ),
                             ),
                           ),

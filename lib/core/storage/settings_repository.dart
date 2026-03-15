@@ -46,6 +46,14 @@ class SettingsRepository {
     return _storageService.getLanguage();
   }
 
+  Future<void> setWatchHistoryEnabled(bool enabled) async {
+    await _storageService.setWatchHistoryEnabled(enabled);
+  }
+
+  bool isWatchHistoryEnabled() {
+    return _storageService.isWatchHistoryEnabled();
+  }
+
   Future<void> setPlayerSetting(String key, dynamic value) async {
     await _storageService.setPlayerSetting(key, value);
   }

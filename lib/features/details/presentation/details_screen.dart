@@ -95,7 +95,7 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
                       placeholder: (context, url) =>
                           Container(color: Theme.of(context).dividerColor),
                       errorWidget: (_, _, _) =>
-                          const ThumbnailErrorPlaceholder(),
+                          ThumbnailErrorPlaceholder(label: item.title, isBackdrop: true),
                     ),
                   ),
                   Container(
@@ -190,6 +190,7 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
                     height: 375,
                     fit: BoxFit.cover,
                     memCacheWidth: 250, // P19: Optimize memory
+                    errorWidget: (_, _, _) => ThumbnailErrorPlaceholder(label: item.title),
                   ),
                 ),
               ),
@@ -329,6 +330,7 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
                   height: 150,
                   fit: BoxFit.cover,
                   memCacheWidth: 200, // P19: Optimize memory (2x for retina)
+                  errorWidget: (_, _, _) => ThumbnailErrorPlaceholder(label: item.title),
                 ),
               ),
             ),
@@ -343,6 +345,12 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
                       height: 50,
                       fit: BoxFit.contain,
                       alignment: Alignment.centerLeft,
+                      errorWidget: (_, _, _) => Text(
+                        item.title,
+                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
                     )
                   else
                     Text(
