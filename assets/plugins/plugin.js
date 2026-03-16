@@ -12,12 +12,6 @@
      */
     // var manifest is injected at runtime
 
-    // 1. (Optional) Register your plugin settings
-    registerSettings([
-        { id: "quality", name: "Default Quality", type: "select", options: ["1080p", "720p"], default: "1080p" },
-        { id: "prefer_dub", name: "Prefer Dubbed", type: "toggle", default: false }
-    ]);
-
     /**
      * Loads the home screen categories.
      * @param {(res: Response) => void} cb 
