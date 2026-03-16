@@ -86,28 +86,50 @@ class _ExtensionsScreenState extends ConsumerState<ExtensionsScreen> {
               child: Text("No repositories or plugins found"),
             );
           }
+          final debugPlugins = state.installedPlugins
+              .where((p) => p.isDebug)
+              .toList();
+          final hasDebug = debugPlugins.isNotEmpty;
+          // Installed plugins not listed in any repo: no repos, or plugin was removed from repo
+          final allAvailablePackageNames = state.availablePlugins.values
+              .expand((list) => list)
+              .map((p) => p.packageName)
+              .toSet();
+          final installedOnlyPlugins = state.installedPlugins
+              .where((p) =>
+                  !p.isDebug && !allAvailablePackageNames.contains(p.packageName))
+              .toList();
+          final hasInstalledOnly = installedOnlyPlugins.isNotEmpty;
+
+          final itemCount = (hasDebug ? 1 : 0) +
+              (hasInstalledOnly ? 1 : 0) +
+              state.repositories.length;
+
           return Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 800),
               child: ListView.builder(
                 controller: _scrollController,
                 padding: const EdgeInsets.only(bottom: 80), // Fab space
-                itemCount:
-                    state.repositories.length +
-                    (state.installedPlugins.any((p) => p.isDebug) ? 1 : 0),
+                itemCount: itemCount,
                 itemBuilder: (context, index) {
-                  final debugPlugins = state.installedPlugins
-                      .where((p) => p.isDebug)
-                      .toList();
-                  final hasDebug = debugPlugins.isNotEmpty;
-
                   // Render Debug Section at index 0 if it exists
                   if (hasDebug && index == 0) {
                     return _buildDebugSection(context, debugPlugins);
                   }
 
-                  // Adjust index for repositories
-                  final repoIndex = hasDebug ? index - 1 : index;
+                  // Render Installed Extensions section (no repos or plugin removed from repo)
+                  if (hasInstalledOnly && index == (hasDebug ? 1 : 0)) {
+                    return _buildInstalledOnlySection(
+                      context,
+                      ref,
+                      installedOnlyPlugins,
+                      hasRepos: state.repositories.isNotEmpty,
+                    );
+                  }
+
+                  // Repositories
+                  final repoIndex = index - (hasDebug ? 1 : 0) - (hasInstalledOnly ? 1 : 0);
                   final repo = state.repositories[repoIndex];
                   final plugins = state.availablePlugins[repo.url] ?? [];
 
@@ -238,6 +260,85 @@ class _ExtensionsScreenState extends ConsumerState<ExtensionsScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildInstalledOnlySection(
+    BuildContext context,
+    WidgetRef ref,
+    List<ExtensionPlugin> plugins, {
+    required bool hasRepos,
+  }) {
+    return Card(
+      margin: const EdgeInsets.only(
+        bottom: LayoutConstants.spacingMd,
+        left: LayoutConstants.spacingMd,
+        right: LayoutConstants.spacingMd,
+        top: LayoutConstants.spacingMd,
+      ),
+      color: Theme.of(context).colorScheme.surface,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Theme.of(context).dividerColor),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        shape: const Border(),
+        collapsedShape: const Border(),
+        initiallyExpanded: true,
+        backgroundColor: Colors.transparent,
+        collapsedBackgroundColor: Colors.transparent,
+        tilePadding: const EdgeInsets.symmetric(
+          horizontal: LayoutConstants.spacingMd,
+          vertical: LayoutConstants.spacingXs,
+        ),
+        title: Row(
+          children: [
+            Icon(
+              Icons.extension,
+              color: Theme.of(context).colorScheme.primary,
+              size: 24,
+            ),
+            const SizedBox(width: LayoutConstants.spacingSm),
+            Text(
+              "Extensions Not in Repositories",
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        subtitle: Text(
+          hasRepos
+              ? "No longer listed in any repository"
+              : "Add a repository to browse and update plugins",
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        children: plugins.asMap().entries.map((entry) {
+          final isLast = entry.key == plugins.length - 1;
+          return Column(
+            children: [
+              if (entry.key == 0)
+                Divider(
+                  height: 1,
+                  color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
+                ),
+              _PluginTile(plugin: entry.value),
+              if (!isLast)
+                Divider(
+                  height: 1,
+                  indent: 56,
+                  endIndent: 16,
+                  color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
+                ),
+            ],
+          );
+        }).toList(),
       ),
     );
   }

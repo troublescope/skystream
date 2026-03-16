@@ -356,11 +356,19 @@ class StorageService {
     return null;
   }
 
+  static const String _kExtensionRepoUrls = 'extension_repo_urls';
+
   Future<void> clearPreferences() async {
     try {
-      // Clear SharedPreferences (Settings, Repo URLs, etc)
       final prefs = await SharedPreferences.getInstance();
+      // Preserve extension repo URLs so installed extensions remain visible after Reset Data
+      final savedRepoUrls = prefs.getStringList(_kExtensionRepoUrls);
+
       await prefs.clear();
+
+      if (savedRepoUrls != null && savedRepoUrls.isNotEmpty) {
+        await prefs.setStringList(_kExtensionRepoUrls, savedRepoUrls);
+      }
 
       // Delete Hive Boxes (Library, History, Settings, Extensions)
       try {

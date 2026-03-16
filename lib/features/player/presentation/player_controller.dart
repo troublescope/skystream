@@ -688,6 +688,24 @@ class PlayerController extends Notifier<PlayerState> {
     try {
       final pos = _player.state.position.inMilliseconds;
       final dur = _player.state.duration.inMilliseconds;
+      final isLivestream = _item.contentType == MultimediaContentType.livestream;
+
+      // Livestreams: save to history without progress (position=0, duration=0)
+      if (isLivestream) {
+        final pId =
+            _item.provider ??
+            ref.read(activeProviderStateProvider)?.packageName ??
+            'Unknown';
+        final itemToSave = _item.copyWith(provider: pId);
+        ref.read(watchHistoryProvider.notifier).saveProgress(
+          itemToSave,
+          0,
+          0,
+          lastStreamUrl: state.currentStream?.url,
+          lastEpisodeUrl: _videoUrl,
+        );
+        return;
+      }
 
       if (dur < 30000) return;
 

@@ -122,29 +122,33 @@ class DetailsActionButtons extends ConsumerWidget {
       ),
     );
 
-    final downloadBtn = CustomButton(
-      isPrimary: false,
-      isOutlined: true,
-      onPressed: () {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Coming soon')));
-      },
-      child: const Padding(
-        padding: EdgeInsets.all(LayoutConstants.spacingMd),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.download_rounded),
-            SizedBox(width: LayoutConstants.spacingXs),
-            Text('Download'),
-          ],
-        ),
-      ),
-    );
+    // Livestreams should not have download feature
+    final isLivestream = item.contentType == MultimediaContentType.livestream;
+    final downloadBtn = isLivestream
+        ? const SizedBox.shrink()
+        : CustomButton(
+            isPrimary: false,
+            isOutlined: true,
+            onPressed: () {
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Coming soon')));
+            },
+            child: const Padding(
+              padding: EdgeInsets.all(LayoutConstants.spacingMd),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.download_rounded),
+                  SizedBox(width: LayoutConstants.spacingXs),
+                  Text('Download'),
+                ],
+              ),
+            ),
+          );
 
     Widget progressWidget = const SizedBox.shrink();
-    if (pos > 0 && dur > 0) {
+    if (pos > 0 && dur > 0 && !isLivestream) {
       final progress = (pos / dur).clamp(0.0, 1.0);
       progressWidget = Padding(
         padding: const EdgeInsets.only(top: 8.0, bottom: 4.0),
@@ -180,8 +184,10 @@ class DetailsActionButtons extends ConsumerWidget {
         children: [
           playBtn,
           progressWidget,
-          const SizedBox(height: LayoutConstants.spacingSm),
-          downloadBtn,
+          if (!isLivestream) ...[
+            const SizedBox(height: LayoutConstants.spacingSm),
+            downloadBtn,
+          ],
         ],
       );
     }
@@ -192,8 +198,10 @@ class DetailsActionButtons extends ConsumerWidget {
         Row(
           children: [
             Expanded(child: playBtn),
-            const SizedBox(width: LayoutConstants.spacingSm),
-            Expanded(child: downloadBtn),
+            if (!isLivestream) ...[
+              const SizedBox(width: LayoutConstants.spacingSm),
+              Expanded(child: downloadBtn),
+            ],
           ],
         ),
         progressWidget,

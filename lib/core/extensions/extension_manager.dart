@@ -243,11 +243,11 @@ class ActiveProviderNotifier extends Notifier<SkyStreamProvider?> {
 
         if (found.isEmpty) {
           debugPrint(
-            "ActiveProviderNotifier: Active provider removed, waiting for reload...",
+            "ActiveProviderNotifier: Active provider removed, showing provider selector.",
           );
           state = null;
           _targetProviderId = currentPackageName;
-          ref.read(providerResolutionLoadingProvider.notifier).set(true);
+          ref.read(providerResolutionLoadingProvider.notifier).set(false);
         } else {
           final match = found.first;
           if (match != state) {
@@ -255,6 +255,15 @@ class ActiveProviderNotifier extends Notifier<SkyStreamProvider?> {
           }
         }
       }
+    });
+
+    // ref.listen only fires on changes, not the initial value. If extensionManager
+    // already has a value when we subscribe (e.g. empty list on fresh install),
+    // the listener never fires. Defer initial load to after build - we cannot
+    // modify other providers (providerResolutionLoadingProvider) during build.
+    Future.microtask(() {
+      _initialLoadDone = true;
+      _loadFromStorage(ref.read(extensionManagerProvider));
     });
 
     return null;
@@ -273,6 +282,11 @@ class ActiveProviderNotifier extends Notifier<SkyStreamProvider?> {
       final p = ref.read(extensionManagerProvider.notifier).getProvider(id);
       if (p != null) {
         state = p;
+        _targetProviderId = null;
+        ref.read(providerResolutionLoadingProvider.notifier).set(false);
+      } else {
+        // Provider not found (no extensions, or saved provider was uninstalled)
+        state = null;
         _targetProviderId = null;
         ref.read(providerResolutionLoadingProvider.notifier).set(false);
       }

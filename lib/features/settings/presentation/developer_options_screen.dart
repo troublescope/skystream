@@ -65,17 +65,18 @@ class _DeveloperOptionsScreenState
                 subtitle: 'Select a local torrent file to play',
                 onTap: () => _pickTorrentFile(context),
               ),
-              SettingsTile(
-                icon: Icons.folder_copy_rounded,
-                title: 'Load plugin from assets',
-                subtitle: _devLoadAssets ? 'Enabled' : 'Disabled',
-                isLast: true,
-                trailing: Switch(
-                  value: _devLoadAssets,
-                  onChanged: (val) => _toggleAssetLoading(context, val),
+              if (kDebugMode)
+                SettingsTile(
+                  icon: Icons.folder_copy_rounded,
+                  title: 'Load plugin from assets',
+                  subtitle: _devLoadAssets ? 'Enabled' : 'Disabled',
+                  isLast: true,
+                  trailing: Switch(
+                    value: _devLoadAssets,
+                    onChanged: (val) => _toggleAssetLoading(context, val),
+                  ),
+                  onTap: () => _toggleAssetLoading(context, !_devLoadAssets),
                 ),
-                onTap: () => _toggleAssetLoading(context, !_devLoadAssets),
-              ),
             ],
           ),
         ],
@@ -100,10 +101,7 @@ class _DeveloperOptionsScreenState
     );
   }
 
-  Future<void> _toggleAssetLoading(
-    BuildContext context,
-    bool newValue,
-  ) async {
+  Future<void> _toggleAssetLoading(BuildContext context, bool newValue) async {
     if (!kDebugMode) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -116,7 +114,11 @@ class _DeveloperOptionsScreenState
     Future<void> handleDevLoadAssetsChanged(bool? newValue) async {
       if (newValue == null) return;
       await ref.read(settingsRepositoryProvider).setDevLoadAssets(newValue);
-      if (context.mounted) setState(() { _devLoadAssets = newValue; });
+      if (context.mounted) {
+        setState(() {
+          _devLoadAssets = newValue;
+        });
+      }
     }
 
     await handleDevLoadAssetsChanged(newValue);

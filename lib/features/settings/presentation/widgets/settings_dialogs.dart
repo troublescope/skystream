@@ -480,17 +480,18 @@ void showThemeDialog(
 
 /// Shows a dialog to reset data.
 void showResetDataDialog(BuildContext context, WidgetRef ref) {
+  final callerContext = context;
   showDialog(
     context: context,
-    builder: (context) => AlertDialog(
+    builder: (dialogContext) => AlertDialog(
       surfaceTintColor: Colors.transparent,
       title: const Text('Reset Data?'),
       content: const Text(
-        'This will clear Settings, Favorites, and History. Your installed Extensions will be SAVED.',
+        'This will clear Settings, Favorites, and History. Your installed Extensions will NOT be deleted.',
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.pop(dialogContext),
           child: Text(
             'Cancel',
             style: TextStyle(
@@ -500,14 +501,14 @@ void showResetDataDialog(BuildContext context, WidgetRef ref) {
         ),
         TextButton(
           onPressed: () async {
-            Navigator.pop(context);
+            Navigator.pop(dialogContext);
 
             // Clear Preferences ONLY
             await ref.read(settingsRepositoryProvider).clearPreferences();
 
-            // Restart App
-            if (context.mounted) {
-              await AppUtils.restartApp(context);
+            // Restart App - use caller's context; dialog context may be disposed after pop
+            if (callerContext.mounted) {
+              await AppUtils.restartApp(callerContext);
             }
           },
           style: TextButton.styleFrom(
@@ -522,9 +523,10 @@ void showResetDataDialog(BuildContext context, WidgetRef ref) {
 
 /// Shows a dialog to factory reset.
 void showFactoryResetDialog(BuildContext context, WidgetRef ref) {
+  final callerContext = context;
   showDialog(
     context: context,
-    builder: (context) => AlertDialog(
+    builder: (dialogContext) => AlertDialog(
       surfaceTintColor: Colors.transparent,
       title: const Text('Factory Reset?'),
       content: const Text(
@@ -532,7 +534,7 @@ void showFactoryResetDialog(BuildContext context, WidgetRef ref) {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.pop(dialogContext),
           child: Text(
             'Cancel',
             style: TextStyle(
@@ -542,13 +544,13 @@ void showFactoryResetDialog(BuildContext context, WidgetRef ref) {
         ),
         TextButton(
           onPressed: () async {
-            Navigator.pop(context);
+            Navigator.pop(dialogContext);
             // Deep Clean (Extensions, Prefs, Hive)
             await ref.read(settingsRepositoryProvider).deleteAllData();
 
-            // Restart App
-            if (context.mounted) {
-              await AppUtils.restartApp(context);
+            // Restart App - use caller's context; dialog context may be disposed after pop
+            if (callerContext.mounted) {
+              await AppUtils.restartApp(callerContext);
             }
           },
           style: TextButton.styleFrom(
