@@ -155,6 +155,16 @@ class SettingsScreen extends ConsumerWidget {
                     ),
                   ),
                   SettingsTile(
+                    icon: Icons.timer_outlined,
+                    title: 'Buffer depth',
+                    subtitle: formatReadahead(playerSettings.readaheadSeconds),
+                    onTap: () => showReadaheadDialog(
+                      context,
+                      ref,
+                      playerSettings.readaheadSeconds,
+                    ),
+                  ),
+                  SettingsTile(
                     icon: Icons.aspect_ratio_rounded,
                     title: 'Default Resize Mode',
                     subtitle: playerSettings.defaultResizeMode,

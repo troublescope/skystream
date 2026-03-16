@@ -13,6 +13,8 @@ import '../../../../core/domain/entity/multimedia_item.dart';
 import '../../../../core/providers/device_info_provider.dart';
 import '../../../../features/settings/presentation/player_settings_provider.dart';
 import '../../../shared/widgets/custom_widgets.dart';
+import 'widgets/retry_overlay.dart';
+import 'widgets/player_loading_overlay.dart';
 import 'widgets/skystream_player_controls.dart';
 import 'player_controller.dart';
 
@@ -368,13 +370,38 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                         ),
                       ),
                     ),
-                    if (playerState.isLoading)
-                      ValueListenableBuilder<bool>(
-                        valueListenable: _forceShowControls,
-                        builder: (_, forceShow, child) {
-                          if (forceShow) return const SizedBox.shrink();
-                          return _buildSkipButtonOverlay(playerState);
-                        },
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 500),
+                      child: playerState.isLoading
+                          ? PlayerLoadingOverlay(
+                              key: const ValueKey('loading'),
+                              title: playerState.playerTitle,
+                              subtitle: "Loading from ${playerState.currentStream?.source ?? 'source'}...",
+                              onDoubleTap: () {
+                                if (Platform.isMacOS ||
+                                    Platform.isWindows ||
+                                    Platform.isLinux) {
+                                  _controlsKeyFinal.currentState
+                                      ?.toggleFullscreen();
+                                }
+                              },
+                              onBack: () => Navigator.pop(context),
+                            )
+                          : const SizedBox.shrink(key: ValueKey('none')),
+                    ),
+
+                    if (playerState.isLoading && !playerState.isManualSwitch)
+                      _buildSkipButtonOverlay(playerState),
+
+                    if (playerState.retryCountdown > 0)
+                      RetryOverlay(
+                        countdown: playerState.retryCountdown,
+                        onRetryNow: () => ref
+                            .read(playerControllerProvider.notifier)
+                            .retryNextStream(),
+                        onCancel: () => ref
+                            .read(playerControllerProvider.notifier)
+                            .cancelRetry(),
                       ),
                   ],
                 ),

@@ -72,50 +72,78 @@ class _PlayerProgressBarState extends State<PlayerProgressBar> {
                     textAlign: TextAlign.right,
                   ),
                 ),
-                // Slider
+                // Slider & Buffer Stack
                 Expanded(
-                  child: SliderTheme(
-                    data: SliderThemeData(
-                      trackHeight: 4,
-                      thumbShape: const RoundSliderThumbShape(
-                        enabledThumbRadius: 8,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // Buffer Track
+                      if (durationMs > 0)
+                        StreamBuilder<Duration>(
+                          stream: widget.player.stream.buffer,
+                          initialData: widget.player.state.buffer,
+                          builder: (context, bufferSnapshot) {
+                            final buffer = bufferSnapshot.data ?? Duration.zero;
+                            final bufferMs = buffer.inMilliseconds.toDouble();
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 24),
+                              child: LinearProgressIndicator(
+                                value: (bufferMs / durationMs).clamp(0, 1),
+                                backgroundColor: Colors.transparent,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white.withValues(alpha: 0.25),
+                                ),
+                                minHeight: 4,
+                              ),
+                            );
+                          },
+                        ),
+                      
+                      // Actual Slider
+                      SliderTheme(
+                        data: SliderThemeData(
+                          trackHeight: 4,
+                          thumbShape: const RoundSliderThumbShape(
+                            enabledThumbRadius: 8,
+                          ),
+                          overlayShape: const RoundSliderOverlayShape(
+                            overlayRadius: 16,
+                          ),
+                          activeTrackColor: Colors.white,
+                          inactiveTrackColor: Colors.white.withValues(alpha: 0.1),
+                          trackShape: const RoundedRectSliderTrackShape(),
+                          thumbColor: Colors.white,
+                          overlayColor: Colors.white.withValues(alpha: 0.2),
+                        ),
+                        child: CustomSlider(
+                          value: displayValue.clamp(
+                            0,
+                            durationMs > 0 ? durationMs : 1.0,
+                          ),
+                          min: 0.0,
+                          max: durationMs > 0 ? durationMs : 1.0,
+                          step: 5000, // 5 seconds step
+                          onChanged: (val) {
+                            setState(() {
+                              _dragValue = val;
+                            });
+                          },
+                          onChangeStart: (val) {
+                            widget.onSeekStart?.call();
+                            setState(() {
+                              _dragValue = val;
+                            });
+                          },
+                          onChangeEnd: (val) {
+                            widget.player.seek(Duration(milliseconds: val.toInt()));
+                            widget.onSeekEnd?.call();
+                            setState(() {
+                              _dragValue = null;
+                            });
+                          },
+                        ),
                       ),
-                      overlayShape: const RoundSliderOverlayShape(
-                        overlayRadius: 16,
-                      ),
-                      activeTrackColor: Colors.white,
-                      inactiveTrackColor: Colors.grey,
-                      trackShape: const RoundedRectSliderTrackShape(),
-                      thumbColor: Colors.white,
-                      overlayColor: Colors.white.withValues(alpha: 0.2),
-                    ),
-                    child: CustomSlider(
-                      value: displayValue.clamp(
-                        0,
-                        durationMs > 0 ? durationMs : 1.0,
-                      ),
-                      min: 0.0,
-                      max: durationMs > 0 ? durationMs : 1.0,
-                      step: 5000, // 5 seconds step
-                      onChanged: (val) {
-                        setState(() {
-                          _dragValue = val;
-                        });
-                      },
-                      onChangeStart: (val) {
-                        widget.onSeekStart?.call();
-                        setState(() {
-                          _dragValue = val;
-                        });
-                      },
-                      onChangeEnd: (val) {
-                        widget.player.seek(Duration(milliseconds: val.toInt()));
-                        widget.onSeekEnd?.call();
-                        setState(() {
-                          _dragValue = null;
-                        });
-                      },
-                    ),
+                    ],
                   ),
                 ),
                 // Duration text

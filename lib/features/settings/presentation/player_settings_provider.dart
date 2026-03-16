@@ -16,6 +16,7 @@ class PlayerSettings {
   final bool hardwareDecoding;
   final String?
       preferredPlayer; // null = internal, 'vlc' / 'mpv' etc. = external
+  final int readaheadSeconds;
 
   const PlayerSettings({
     this.leftGesture = PlayerGesture.brightness,
@@ -29,6 +30,7 @@ class PlayerSettings {
     this.subtitleBackgroundColor = 0x00000000, // Transparent
     this.hardwareDecoding = true,
     this.preferredPlayer,
+    this.readaheadSeconds = 300,
   });
 
   PlayerSettings copyWith({
@@ -44,6 +46,7 @@ class PlayerSettings {
     bool? hardwareDecoding,
     String? preferredPlayer,
     bool clearPreferredPlayer = false,
+    int? readaheadSeconds,
   }) {
     return PlayerSettings(
       leftGesture: leftGesture ?? this.leftGesture,
@@ -60,6 +63,7 @@ class PlayerSettings {
       preferredPlayer: clearPreferredPlayer
           ? null
           : (preferredPlayer ?? this.preferredPlayer),
+      readaheadSeconds: readaheadSeconds ?? this.readaheadSeconds,
     );
   }
 }
@@ -81,6 +85,7 @@ class PlayerSettingsNotifier extends AsyncNotifier<PlayerSettings> {
     final prefPlayer = storage.getPlayerSetting<String>('player_preferred');
     final swipeSeek = storage.getPlayerSetting<bool>('player_swipe_seek', defaultValue: true) ?? true;
     final hwDec = storage.getPlayerSetting<bool>('player_hw_dec', defaultValue: true) ?? true;
+    final rSecons = storage.getPlayerSetting<int>('player_readahead', defaultValue: 300) ?? 300;
 
     return PlayerSettings(
       leftGesture: _parse(l),
@@ -94,6 +99,7 @@ class PlayerSettingsNotifier extends AsyncNotifier<PlayerSettings> {
       subtitleBackgroundColor: subBg,
       hardwareDecoding: hwDec,
       preferredPlayer: prefPlayer,
+      readaheadSeconds: rSecons,
     );
   }
 
@@ -164,6 +170,12 @@ class PlayerSettingsNotifier extends AsyncNotifier<PlayerSettings> {
       final current = state.asData?.value ?? const PlayerSettings();
       state = AsyncData(current.copyWith(preferredPlayer: playerId));
     }
+  }
+
+  Future<void> setReadaheadSeconds(int seconds) async {
+    await _repository.setPlayerSetting('player_readahead', seconds);
+    final current = state.asData?.value ?? const PlayerSettings();
+    state = AsyncData(current.copyWith(readaheadSeconds: seconds));
   }
 
   PlayerGesture _parse(String s) {

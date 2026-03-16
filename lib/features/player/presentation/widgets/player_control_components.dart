@@ -251,7 +251,9 @@ class PlayerActionButton extends StatelessWidget {
                     angle: value * 3.14159,
                     child: Icon(
                       icon,
-                      color: highlight ? Colors.blue : Colors.white,
+                      color: highlight
+                          ? Theme.of(context).colorScheme.primary
+                          : Colors.white,
                       size: 28,
                     ),
                   );
@@ -261,7 +263,9 @@ class PlayerActionButton extends StatelessWidget {
               Text(
                 label,
                 style: TextStyle(
-                  color: highlight ? Colors.blue : Colors.white,
+                  color: highlight
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.white,
                   fontSize: 12,
                 ),
               ),

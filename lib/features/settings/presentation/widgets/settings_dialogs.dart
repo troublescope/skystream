@@ -22,6 +22,11 @@ String formatSeekDuration(int seconds) {
   return '$seconds sec';
 }
 
+/// Formats readahead seconds for display (e.g. "5 min", "10 min").
+String formatReadahead(int seconds) {
+  return '${seconds ~/ 60} min';
+}
+
 /// Returns a human-readable name for a player ID.
 String getPlayerDisplayName(String? playerId) {
   if (playerId == null) return 'Internal (media_kit)';
@@ -140,6 +145,37 @@ void showResizeDialog(BuildContext context, WidgetRef ref, String current) {
           children: options
               .map((e) => RadioListTile<String>(title: Text(e), value: e))
               .toList(),
+        ),
+      ),
+    ),
+  );
+}
+
+/// Shows a dialog to pick the readahead duration (5-10 min).
+void showReadaheadDialog(BuildContext context, WidgetRef ref, int current) {
+  // 1 to 20 minutes in 1-minute steps
+  final options = List.generate(20, (i) => (1 + i) * 60);
+
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      surfaceTintColor: Colors.transparent,
+      title: const Text('Select Buffer depth'),
+      content: RadioGroup<int>(
+        groupValue: current,
+        onChanged: (val) {
+          if (val == null) return;
+          ref.read(playerSettingsProvider.notifier).setReadaheadSeconds(val);
+          Navigator.pop(context);
+        },
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: options.map((sec) {
+            return RadioListTile<int>(
+              title: Text(formatReadahead(sec)),
+              value: sec,
+            );
+          }).toList(),
         ),
       ),
     ),
@@ -474,7 +510,9 @@ void showResetDataDialog(BuildContext context, WidgetRef ref) {
               await AppUtils.restartApp(context);
             }
           },
-          style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.tertiary),
+          style: TextButton.styleFrom(
+            foregroundColor: Theme.of(context).colorScheme.tertiary,
+          ),
           child: const Text('Reset Data'),
         ),
       ],
@@ -513,7 +551,9 @@ void showFactoryResetDialog(BuildContext context, WidgetRef ref) {
               await AppUtils.restartApp(context);
             }
           },
-          style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
+          style: TextButton.styleFrom(
+            foregroundColor: Theme.of(context).colorScheme.error,
+          ),
           child: const Text('Factory Reset'),
         ),
       ],

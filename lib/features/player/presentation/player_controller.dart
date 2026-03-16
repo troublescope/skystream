@@ -15,6 +15,7 @@ import '../../../../core/extensions/providers.dart';
 import '../../../../core/models/torrent_status.dart';
 import '../../../../core/storage/history_repository.dart';
 import '../../library/presentation/history_provider.dart';
+import '../../../../core/providers/device_info_provider.dart';
 import '../../settings/presentation/player_settings_provider.dart';
 
 class PlayerState {
@@ -31,6 +32,11 @@ class PlayerState {
   final bool isManualSwitch;
   final bool isOpeningStream;
   final bool isReverting;
+  final bool showNextEpisodeOverlay;
+  final String? nextEpisodeTitle;
+  final double buffer; // 0.0 to 1.0 (buffer ahead as percentage of duration)
+  final int retryCountdown; // seconds remaining before auto-retry
+  final bool isAdaptiveBufferingActive;
 
   const PlayerState({
     this.isLoading = true,
@@ -46,6 +52,11 @@ class PlayerState {
     this.isManualSwitch = false,
     this.isOpeningStream = false,
     this.isReverting = false,
+    this.showNextEpisodeOverlay = false,
+    this.nextEpisodeTitle,
+    this.buffer = 0.0,
+    this.retryCountdown = 0,
+    this.isAdaptiveBufferingActive = false,
   });
 
   PlayerState copyWith({
@@ -62,6 +73,11 @@ class PlayerState {
     bool? isManualSwitch,
     bool? isOpeningStream,
     bool? isReverting,
+    bool? showNextEpisodeOverlay,
+    String? nextEpisodeTitle,
+    double? buffer,
+    int? retryCountdown,
+    bool? isAdaptiveBufferingActive,
   }) {
     return PlayerState(
       isLoading: isLoading ?? this.isLoading,
@@ -77,6 +93,13 @@ class PlayerState {
       isManualSwitch: isManualSwitch ?? this.isManualSwitch,
       isOpeningStream: isOpeningStream ?? this.isOpeningStream,
       isReverting: isReverting ?? this.isReverting,
+      showNextEpisodeOverlay:
+          showNextEpisodeOverlay ?? this.showNextEpisodeOverlay,
+      nextEpisodeTitle: nextEpisodeTitle ?? this.nextEpisodeTitle,
+      buffer: buffer ?? this.buffer,
+      retryCountdown: retryCountdown ?? this.retryCountdown,
+      isAdaptiveBufferingActive:
+          isAdaptiveBufferingActive ?? this.isAdaptiveBufferingActive,
     );
   }
 }
@@ -87,7 +110,7 @@ class PlayerController extends Notifier<PlayerState> {
   late String _videoUrl;
   Timer? _torrentPollTimer;
   bool _isPolling = false;
-
+  
   // Track last saved position for threshold-based saving
   Duration _lastSavedPosition = Duration.zero;
   static const double _saveThresholdPercent = 0.05; // 5% of video
@@ -97,12 +120,19 @@ class PlayerController extends Notifier<PlayerState> {
   StreamSubscription? _errorSub;
   StreamSubscription? _playingSub;
   StreamSubscription? _positionSub;
+  StreamSubscription? _bufferingSub;
+  StreamSubscription? _progressSub;
+  
+  final List<DateTime> _bufferDepletionTimes = [];
+  Timer? _retryTimer;
 
   @override
   PlayerState build() {
     ref.keepAlive();
     return const PlayerState();
   }
+
+  bool get isSeries => _item.contentType == MultimediaContentType.series;
 
   Future<void> init({
     required Player player,
@@ -152,6 +182,8 @@ class PlayerController extends Notifier<PlayerState> {
     _setupEventDrivenProgressSaving();
     _setupErrorListener();
     _setupVideoParamsListener();
+    _setupBufferingMonitor();
+    _setupProgressMonitor();
 
     await _initStream();
   }
@@ -166,23 +198,96 @@ class PlayerController extends Notifier<PlayerState> {
     });
   }
 
+
+  void _setupBufferingMonitor() {
+    _bufferingSub?.cancel();
+    _bufferingSub = _player.stream.buffering.listen((isBuffering) {
+      if (isBuffering) {
+        _handleBufferStall();
+      }
+    });
+  }
+
+  void _setupProgressMonitor() {
+    _progressSub?.cancel();
+    // Update buffer percentage for UI
+    _progressSub = _player.stream.buffer.listen((buffer) {
+      final total = _player.state.duration.inMilliseconds;
+      if (total > 0) {
+        state = state.copyWith(buffer: buffer.inMilliseconds / total);
+      }
+    });
+  }
+
+  void _handleBufferStall() {
+    if (_isLiveStream(_videoUrl)) return;
+    
+    final now = DateTime.now();
+    _bufferDepletionTimes.add(now);
+
+    // Keep only stalls in the last 60 seconds
+    _bufferDepletionTimes.removeWhere(
+      (t) => now.difference(t) > const Duration(seconds: 60),
+    );
+
+    if (_bufferDepletionTimes.length >= 2 && !state.isAdaptiveBufferingActive) {
+      debugPrint(
+        "Multiple buffer stalls detected. Activating adaptive buffering.",
+      );
+      state = state.copyWith(isAdaptiveBufferingActive: true);
+
+      // Re-apply properties with aggressive buffering
+      if (_player.platform is NativePlayer) {
+        final settings = ref.read(playerSettingsProvider).asData?.value;
+        final readahead = (settings?.readaheadSeconds ?? 300) * 2;
+        final native = _player.platform as NativePlayer;
+        // Double the readahead and cache for VOD if stalled
+        if (_player.state.duration > Duration.zero) {
+          native.setProperty('demuxer-readahead-secs', '$readahead');
+          native.setProperty('cache-secs', '$readahead');
+        }
+      }
+    }
+  }
+
   void _setupErrorListener() {
     _errorSub = _player.stream.error.listen((error) {
       debugPrint("Player Error: $error");
       if (state.isOpeningStream) return;
       if (error.toString().toLowerCase().contains("abort")) return;
 
-      if (state.isLoading) {
+      if (state.isLoading || _player.state.position == Duration.zero) {
         if (state.isManualSwitch) {
           revertToPreviousStream("Stream failed. Reverting...");
         } else {
-          retryNextStream();
+          startRetryCountdown();
         }
       }
     });
   }
 
+  void startRetryCountdown() {
+    _retryTimer?.cancel();
+    state = state.copyWith(retryCountdown: 5);
+
+    _retryTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (state.retryCountdown > 1) {
+        state = state.copyWith(retryCountdown: state.retryCountdown - 1);
+      } else {
+        timer.cancel();
+        state = state.copyWith(retryCountdown: 0);
+        retryNextStream();
+      }
+    });
+  }
+
+  void cancelRetry() {
+    _retryTimer?.cancel();
+    state = state.copyWith(retryCountdown: 0, isLoading: false);
+  }
+
   void _setupEventDrivenProgressSaving() {
+    _playingSub?.cancel();
     _playingSub = _player.stream.playing.listen((isPlaying) {
       if (!isPlaying) {
         saveProgress();
@@ -195,6 +300,7 @@ class PlayerController extends Notifier<PlayerState> {
       }
     });
 
+    _positionSub?.cancel();
     _positionSub = _player.stream.position.listen((pos) {
       final duration = _player.state.duration;
       if (duration == Duration.zero) return;
@@ -206,6 +312,29 @@ class PlayerController extends Notifier<PlayerState> {
       if ((currentPct - lastPct).abs() >= _saveThresholdPercent) {
         saveProgress();
         _lastSavedPosition = pos;
+      }
+
+      // Next Episode Detection (Series only, trigger 15s before end)
+      if (_item.contentType == MultimediaContentType.series) {
+        final remaining = duration - pos;
+        if (remaining.inSeconds <= 15 &&
+            remaining.inSeconds > 0 &&
+            !state.showNextEpisodeOverlay) {
+          final currentEp = _item.episodes?.indexWhere(
+            (e) => e.url == _videoUrl,
+          );
+          if (currentEp != null &&
+              currentEp != -1 &&
+              currentEp < _item.episodes!.length - 1) {
+            final next = _item.episodes![currentEp + 1];
+            state = state.copyWith(
+              showNextEpisodeOverlay: true,
+              nextEpisodeTitle: next.name,
+            );
+          }
+        } else if (remaining.inSeconds > 15 && state.showNextEpisodeOverlay) {
+          state = state.copyWith(showNextEpisodeOverlay: false);
+        }
       }
     });
   }
@@ -233,7 +362,17 @@ class PlayerController extends Notifier<PlayerState> {
             streams: streams,
             currentStreamIndex: initialIndex,
           );
-          await loadStreamAtIndex(initialIndex);
+
+          // PERFORMANCE: Parallel check the first few streams (health check)
+          // This avoids waiting for a timeout on a dead stream if a working one is available
+          final checkCount = streams.length > 3 ? 3 : streams.length;
+          final workingIndex = await _findFirstWorkingStream(
+            streams,
+            startIndex: initialIndex,
+            limit: checkCount,
+          );
+
+          await loadStreamAtIndex(workingIndex);
           return;
         }
       }
@@ -301,12 +440,12 @@ class PlayerController extends Notifier<PlayerState> {
     try {
       final historyRepo = ref.read(historyRepositoryProvider);
       final isSeries = _item.contentType == MultimediaContentType.series;
-      
+
       String? lastUrl;
       if (isSeries) {
         lastUrl = historyRepo.getLastStreamUrl(_videoUrl);
       }
-      
+
       if (lastUrl == null) {
         final historyList = ref.read(watchHistoryProvider);
         final previousState = historyList.firstWhere(
@@ -370,7 +509,7 @@ class PlayerController extends Notifier<PlayerState> {
 
       final historyRepo = ref.read(historyRepositoryProvider);
       final isSeries = _item.contentType == MultimediaContentType.series;
-      
+
       int savedPos = 0;
       if (isSeries) {
         savedPos = historyRepo.getEpisodePosition(_videoUrl);
@@ -525,6 +664,30 @@ class PlayerController extends Notifier<PlayerState> {
     }
   }
 
+  Future<void> playNextEpisode() async {
+    if (_item.contentType != MultimediaContentType.series) return;
+
+    final currentIndex = _item.episodes?.indexWhere((e) => e.url == _videoUrl);
+    if (currentIndex != null &&
+        currentIndex != -1 &&
+        currentIndex < _item.episodes!.length - 1) {
+      final nextEpisode = _item.episodes![currentIndex + 1];
+
+      // Update video URL and refresh
+      _videoUrl = nextEpisode.url;
+      state = state.copyWith(
+        playerTitle: "${_item.title} - ${nextEpisode.name}",
+        showNextEpisodeOverlay: false,
+      );
+
+      await _initStream();
+    }
+  }
+
+  void dismissNextEpisodeOverlay() {
+    state = state.copyWith(showNextEpisodeOverlay: false);
+  }
+
   void saveProgress() {
     try {
       final pos = _player.state.position.inMilliseconds;
@@ -536,7 +699,8 @@ class PlayerController extends Notifier<PlayerState> {
       final bool isSeries = _item.contentType == MultimediaContentType.series;
       final historyNotifier = ref.read(watchHistoryProvider.notifier);
 
-      final pId = _item.provider ??
+      final pId =
+          _item.provider ??
           ref.read(activeProviderStateProvider)?.packageName ??
           'Unknown';
       final itemToSave = _item.copyWith(provider: pId);
@@ -545,7 +709,9 @@ class PlayerController extends Notifier<PlayerState> {
       Episode? currentEpisode;
       if (isSeries) {
         try {
-          currentEpisode = _item.episodes!.firstWhere((e) => e.url == _videoUrl);
+          currentEpisode = _item.episodes!.firstWhere(
+            (e) => e.url == _videoUrl,
+          );
         } catch (_) {}
       }
 
@@ -572,9 +738,9 @@ class PlayerController extends Notifier<PlayerState> {
             );
             return;
           } else {
-             // Last episode of the series completed
-             historyNotifier.removeFromHistory(_item.url);
-             return;
+            // Last episode of the series completed
+            historyNotifier.removeFromHistory(_item.url);
+            return;
           }
         }
       }
@@ -667,20 +833,84 @@ class PlayerController extends Notifier<PlayerState> {
     }
   }
 
-  Future<void> disposeController() async {
+  void disposeController() {
     _torrentPollTimer?.cancel();
     _torrentPollTimer = null;
+    _retryTimer?.cancel();
+    _retryTimer = null;
 
     _videoParamsSub?.cancel();
     _errorSub?.cancel();
     _playingSub?.cancel();
     _positionSub?.cancel();
+    _bufferingSub?.cancel();
+    _progressSub?.cancel();
 
     saveProgress();
     ref.read(torrentServiceProvider).stop();
     Future.microtask(() {
       state = const PlayerState();
     });
+  }
+
+  Future<int> _findFirstWorkingStream(
+    List<StreamResult> streams, {
+    required int startIndex,
+    required int limit,
+  }) async {
+    if (streams.isEmpty) return 0;
+
+    // Safety check for start index
+    final int start = startIndex.clamp(0, streams.length - 1);
+
+    // Extract candidates (circular if needed, though usually not)
+    final candidates = <int>[];
+    for (int i = 0; i < limit; i++) {
+      final idx = (start + i) % streams.length;
+      if (!candidates.contains(idx)) candidates.add(idx);
+    }
+
+    if (candidates.length <= 1) return start;
+
+    try {
+      debugPrint(
+        "Starting parallel health check for ${candidates.length} streams",
+      );
+      final results = await Future.wait(
+        candidates.map((idx) async {
+          final s = streams[idx];
+          // Skip torrents/local files from parallel check
+          if (s.url.startsWith("magnet:") ||
+              s.url.endsWith(".torrent") ||
+              s.url.startsWith("/")) {
+            return MapEntry(idx, true);
+          }
+
+          try {
+            final uri = Uri.parse(s.url);
+            // Use a short timeout for health check
+            final resp = await http
+                .head(uri, headers: s.headers)
+                .timeout(const Duration(seconds: 3));
+            return MapEntry(idx, resp.statusCode < 400);
+          } catch (_) {
+            return MapEntry(idx, false);
+          }
+        }),
+      );
+
+      // Return first one that responded positively in the original order of preference
+      for (final entry in results) {
+        if (entry.value) {
+          debugPrint("Stream ${entry.key} is healthy");
+          return entry.key;
+        }
+      }
+    } catch (e) {
+      debugPrint("Parallel check failed: $e");
+    }
+
+    return start; // Fallback to initial
   }
 
   String _getProviderDisplayName(String providerName) {
@@ -729,6 +959,24 @@ class PlayerController extends Notifier<PlayerState> {
 
       final lowerHeaders = headers.map((k, v) => MapEntry(k.toLowerCase(), v));
 
+      // Propagate ALL provided headers to MPV (Critical for cookies/auth)
+      if (lowerHeaders.isNotEmpty) {
+        final List<String> headerFields = [];
+        lowerHeaders.forEach((key, value) {
+          // FFmpeg/libavformat "headers" option standard is CRLF terminated strings.
+          // Comma-separated list is also accepted by MPV but CRLF is more robust.
+          headerFields.add('$key: $value');
+        });
+
+        if (headerFields.isNotEmpty) {
+          // Join with \r\n and ensure it ends with \r\n
+          final fields = '${headerFields.join('\r\n')}\r\n';
+          debugPrint('Player: Setting http-header-fields: $fields');
+          await native.setProperty('http-header-fields', fields);
+        }
+      }
+
+      // Also set dedicated properties for better compatibility
       if (lowerHeaders.containsKey('user-agent')) {
         await native.setProperty('user-agent', lowerHeaders['user-agent']!);
       }
@@ -746,8 +994,38 @@ class PlayerController extends Notifier<PlayerState> {
 
       // 1. Performance tuning & Anti-Looping
       await native.setProperty('cache', 'yes');
-      await native.setProperty('demuxer-max-bytes', '500MiB');
-      await native.setProperty('demuxer-max-back-bytes', '50MiB');
+
+      final isLivePattern =
+          _isLiveStream(stream.url) ||
+          _item.contentType == MultimediaContentType.livestream;
+      debugPrint(
+        'Stream Type (isLivePattern): $isLivePattern, URL: ${stream.url}',
+      );
+      if (isLivePattern) {
+        await native.setProperty('demuxer-readahead-secs', '5');
+        await native.setProperty('cache-secs', '0');
+        await native.setProperty('cache', 'no');
+      } else {
+        final settings = ref.read(playerSettingsProvider).asData?.value;
+        final readahead = settings?.readaheadSeconds ?? 300;
+        await native.setProperty('demuxer-readahead-secs', '$readahead');
+        await native.setProperty('cache-secs', '$readahead');
+        await native.setProperty('cache', 'yes');
+      }
+
+      // Adaptive demuxer cache based on device profile
+      final profile = ref.read(deviceProfileProvider).asData?.value;
+      String cacheSize = "512MiB"; // Default
+      if (profile != null) {
+        if (profile.isTv) {
+          cacheSize = "128MiB"; // Less RAM on TVs
+        } else if (profile.isDesktopOS || profile.isTablet) {
+          cacheSize = "1GiB"; // More RAM on Desktop/Tablets
+        }
+      }
+
+      await native.setProperty('demuxer-max-bytes', cacheSize);
+      await native.setProperty('demuxer-max-back-bytes', '32MiB');
 
       // 2. Resolve ClearKey Hex Keys
       String? keyHex = stream.drmKey;
@@ -848,6 +1126,38 @@ class PlayerController extends Notifier<PlayerState> {
     }
   }
 
+  bool _isLiveStream(String url) {
+    if (url.isEmpty) return false;
+    final lower = url.toLowerCase();
+
+    // Torrents and local files are definitely VOD
+    if (lower.startsWith('magnet:') ||
+        lower.endsWith('.torrent') ||
+        lower.startsWith('/')) {
+      return false;
+    }
+
+    // Live protocols
+    if (lower.startsWith('rtmp://') ||
+        lower.startsWith('rtsp://') ||
+        lower.startsWith('mms://') ||
+        lower.startsWith('udp://') ||
+        lower.startsWith('rtp://')) {
+      return true;
+    }
+
+    // IPTV specific path/query patterns
+    if (lower.contains('/live/') ||
+        lower.contains('/iptv/') ||
+        lower.contains('stream.m3u8') ||
+        lower.contains('chunklist')) {
+      return true;
+    }
+
+    // Default to VOD for bandwidth protection (listener will catch false negatives)
+    return false;
+  }
+
   Future<void> _safeSeekTo(int position) async {
     if (position <= 0) return;
     try {
@@ -862,6 +1172,7 @@ class PlayerController extends Notifier<PlayerState> {
       debugPrint("Timeout waiting for duration or seek failed: $e");
     }
   }
+
 }
 
 final playerControllerProvider =

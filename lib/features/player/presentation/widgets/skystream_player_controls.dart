@@ -6,6 +6,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_volume_controller/flutter_volume_controller.dart';
+import '../player_controller.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import '../../../../core/domain/entity/multimedia_item.dart';
 import '../../../../core/models/torrent_status.dart';
@@ -15,6 +16,7 @@ import '../../../../core/providers/device_info_provider.dart';
 import '../../../../core/utils/responsive_breakpoints.dart';
 import 'player_stream_widgets.dart';
 import 'player_control_components.dart';
+import 'next_episode_overlay.dart';
 import 'player_bottom_sheets.dart';
 import 'player_loading_overlay.dart';
 import 'player_osd_overlay.dart';
@@ -581,6 +583,8 @@ class SkyStreamPlayerControlsState
 
     if (_isInPip || isSmallWindow) return const SizedBox.shrink();
 
+    final playerState = ref.watch(playerControllerProvider);
+
     // Loading state: simplified UI
     if (widget.isLoading || _duration == Duration.zero) {
       if (!widget.forceShowControls) {
@@ -686,6 +690,14 @@ class SkyStreamPlayerControlsState
                   getDuration: () => _duration,
                   formatDuration: _formatDuration,
                 ),
+
+                // Next Episode Overlay (Persistent when triggered)
+                if (playerState.showNextEpisodeOverlay && playerState.nextEpisodeTitle != null)
+                  NextEpisodeOverlay(
+                    nextEpisodeTitle: playerState.nextEpisodeTitle!,
+                    onPlayNext: () => ref.read(playerControllerProvider.notifier).playNextEpisode(),
+                    onDismiss: () => ref.read(playerControllerProvider.notifier).dismissNextEpisodeOverlay(),
+                  ),
               ],
             ),
           ),
@@ -887,6 +899,17 @@ class SkyStreamPlayerControlsState
                                             ),
                                       ),
                                     ),
+                                    if (ref.read(playerControllerProvider.notifier).isSeries)
+                                      FocusTraversalOrder(
+                                        order: const NumericFocusOrder(6.5),
+                                        child: _buildActionButton(
+                                          icon: Icons.skip_next,
+                                          label: "Next",
+                                          onTap: () => ref
+                                              .read(playerControllerProvider.notifier)
+                                              .playNextEpisode(),
+                                        ),
+                                      ),
                                     if (Platform.isAndroid &&
                                         !Platform.isIOS &&
                                         !(ref
@@ -975,6 +998,8 @@ class SkyStreamPlayerControlsState
     return PlayerLoadingOverlay(
       onDoubleTap: _handleDoubleTap,
       onBack: () => Navigator.of(context).pop(),
+      title: widget.title,
+      subtitle: widget.subtitle,
     );
   }
 }
