@@ -48,9 +48,7 @@ class _NextEpisodeOverlayState extends State<NextEpisodeOverlay> {
 
   @override
   Widget build(BuildContext context) {
-    return Positioned(
-      bottom: 120,
-      right: 32,
+    return Center(
       child: Material(
         color: Colors.transparent,
         child: Container(

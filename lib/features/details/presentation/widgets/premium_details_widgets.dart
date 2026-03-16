@@ -16,7 +16,8 @@ class MetadataBar extends StatelessWidget {
   Widget build(BuildContext context) {
     // theme and context used in helper methods
     final contentType = item.contentType;
-    final showTypeBadge = !isLoading || (contentType != MultimediaContentType.movie);
+    final showTypeBadge =
+        !isLoading || (contentType != MultimediaContentType.movie);
 
     return Wrap(
       spacing: 12,
@@ -33,22 +34,42 @@ class MetadataBar extends StatelessWidget {
             isFilled: true,
           )
         else
-          ShimmerPlaceholder.rectangular(width: 60, height: 20, borderRadius: 6),
-        
+          ShimmerPlaceholder.rectangular(
+            width: 60,
+            height: 20,
+            borderRadius: 6,
+          ),
+
         if (item.year != null)
-          _buildIconInfo(context, Icons.calendar_today_rounded, item.year.toString())
+          _buildIconInfo(
+            context,
+            Icons.calendar_today_rounded,
+            item.year.toString(),
+          )
         else if (isLoading)
-          ShimmerPlaceholder.rectangular(width: 40, height: 16, borderRadius: 4),
+          ShimmerPlaceholder.rectangular(
+            width: 60,
+            height: 20,
+            borderRadius: 4,
+          ),
 
         if (item.contentRating != null)
           _buildBorderedInfo(context, item.contentRating!)
         else if (isLoading)
-          ShimmerPlaceholder.rectangular(width: 30, height: 16, borderRadius: 4),
+          ShimmerPlaceholder.rectangular(
+            width: 60,
+            height: 20,
+            borderRadius: 4,
+          ),
 
         if (item.duration != null)
           _buildIconInfo(context, Icons.timer_outlined, "${item.duration}m")
         else if (isLoading)
-          ShimmerPlaceholder.rectangular(width: 50, height: 16, borderRadius: 4),
+          ShimmerPlaceholder.rectangular(
+            width: 60,
+            height: 20,
+            borderRadius: 4,
+          ),
 
         if (item.score != null)
           _buildIconInfo(
@@ -58,7 +79,11 @@ class MetadataBar extends StatelessWidget {
             iconColor: const Color(0xFF01B4E4),
           )
         else if (isLoading)
-          ShimmerPlaceholder.rectangular(width: 40, height: 16, borderRadius: 4),
+          ShimmerPlaceholder.rectangular(
+            width: 60,
+            height: 20,
+            borderRadius: 4,
+          ),
 
         if (item.playbackPolicy != null && item.playbackPolicy != "none")
           _buildPlaybackBadge(context, item.playbackPolicy!),
@@ -87,7 +112,7 @@ class MetadataBar extends StatelessWidget {
   }) {
     final theme = Theme.of(context);
     final themeColor = color ?? theme.colorScheme.onSurface;
-    
+
     if (isFilled) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -143,7 +168,9 @@ class MetadataBar extends StatelessWidget {
         Icon(
           icon,
           size: 14,
-          color: iconColor ?? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+          color:
+              iconColor ??
+              Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
         ),
         const SizedBox(width: 4),
         _buildInfoText(context, text),
@@ -454,9 +481,8 @@ class RecommendationsCarousel extends StatelessWidget {
                             ),
                             fit: BoxFit.cover,
                             width: 110,
-                            errorWidget: (_, _, _) => ThumbnailErrorPlaceholder(
-                              label: item.title,
-                            ),
+                            errorWidget: (_, _, _) =>
+                                ThumbnailErrorPlaceholder(label: item.title),
                           ),
                         ),
                       ),

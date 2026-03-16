@@ -13,8 +13,6 @@ import '../../../../core/domain/entity/multimedia_item.dart';
 import '../../../../core/providers/device_info_provider.dart';
 import '../../../../features/settings/presentation/player_settings_provider.dart';
 import '../../../shared/widgets/custom_widgets.dart';
-import 'widgets/retry_overlay.dart';
-import 'widgets/player_loading_overlay.dart';
 import 'widgets/skystream_player_controls.dart';
 import 'player_controller.dart';
 
@@ -321,13 +319,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                         controller: _videoController,
                         configuration: SubtitleViewConfiguration(
                           style: TextStyle(
-                            fontSize:
-                                subtitleSettings?.subtitleSize ?? 22.0,
+                            fontSize: subtitleSettings?.subtitleSize ?? 22.0,
                             color: Color(
                               subtitleSettings?.subtitleColor ?? 0xFFFFFFFF,
                             ),
                             backgroundColor: Color(
-                              subtitleSettings?.subtitleBackgroundColor ?? 0x00000000,
+                              subtitleSettings?.subtitleBackgroundColor ??
+                                  0x00000000,
                             ),
                             shadows: const [
                               Shadow(
@@ -370,38 +368,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                         ),
                       ),
                     ),
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 500),
-                      child: playerState.isLoading
-                          ? PlayerLoadingOverlay(
-                              key: const ValueKey('loading'),
-                              title: playerState.playerTitle,
-                              subtitle: "Loading from ${playerState.currentStream?.source ?? 'source'}...",
-                              onDoubleTap: () {
-                                if (Platform.isMacOS ||
-                                    Platform.isWindows ||
-                                    Platform.isLinux) {
-                                  _controlsKeyFinal.currentState
-                                      ?.toggleFullscreen();
-                                }
-                              },
-                              onBack: () => Navigator.pop(context),
-                            )
-                          : const SizedBox.shrink(key: ValueKey('none')),
-                    ),
-
-                    if (playerState.isLoading && !playerState.isManualSwitch)
-                      _buildSkipButtonOverlay(playerState),
-
-                    if (playerState.retryCountdown > 0)
-                      RetryOverlay(
-                        countdown: playerState.retryCountdown,
-                        onRetryNow: () => ref
-                            .read(playerControllerProvider.notifier)
-                            .retryNextStream(),
-                        onCancel: () => ref
-                            .read(playerControllerProvider.notifier)
-                            .cancelRetry(),
+                    if (playerState.isLoading)
+                      ValueListenableBuilder<bool>(
+                        valueListenable: _forceShowControls,
+                        builder: (_, forceShow, child) {
+                          if (forceShow) return const SizedBox.shrink();
+                          return _buildSkipButtonOverlay(playerState);
+                        },
                       ),
                   ],
                 ),
@@ -446,7 +419,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                               const Icon(Icons.skip_next),
                               const SizedBox(width: 8),
                               Text(
-                                "Skip Loading (${playerState.currentStreamIndex + 1}/${playerState.streams.length})",
+                                "Skip to manual source selection (${playerState.currentStreamIndex + 1}/${playerState.streams.length})",
                               ),
                             ],
                           ),

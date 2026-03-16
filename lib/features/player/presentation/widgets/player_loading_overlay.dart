@@ -22,12 +22,8 @@ class PlayerLoadingOverlay extends StatelessWidget {
       child: Stack(
         children: [
           // Solid background
-          Positioned.fill(
-            child: Container(
-              color: Colors.black,
-            ),
-          ),
-          
+          Positioned.fill(child: Container(color: Colors.black)),
+
           // Back button
           Positioned(
             top: MediaQuery.viewPaddingOf(context).top + 16,
@@ -38,13 +34,17 @@ class PlayerLoadingOverlay extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white, size: 36),
+                icon: const Icon(
+                  Icons.arrow_back,
+                  color: Colors.white,
+                  size: 36,
+                ),
                 tooltip: 'Go Back',
                 onPressed: onBack,
               ),
             ),
           ),
-          
+
           // Loading Content
           Center(
             child: Column(
@@ -66,13 +66,16 @@ class PlayerLoadingOverlay extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     subtitle!,
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                    ),
+                    style: const TextStyle(color: Colors.white70, fontSize: 14),
                     textAlign: TextAlign.center,
                   ),
                 ],
+                const SizedBox(height: 22),
+                const Text(
+                  "Searching for the best available source…",
+                  style: TextStyle(color: Colors.white54, fontSize: 14),
+                  textAlign: TextAlign.center,
+                ),
               ],
             ),
           ),
