@@ -244,6 +244,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
     // Main content
     return homeDataAsync.when(
+      skipLoadingOnReload: false,
       data: (data) {
         final filteredEntries = data.entries
             .where((e) => e.key != 'Trending')
@@ -365,7 +366,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
-              onPressed: () => ref.invalidate(homeDataProvider),
+              onPressed: () => ref.refresh(homeDataProvider),
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
             ),

@@ -358,7 +358,7 @@ class StorageService {
 
   static const String _kExtensionRepoUrls = 'extension_repo_urls';
 
-  Future<void> clearPreferences() async {
+  Future<void> clearPreferences({bool keepRepos = true}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       // Preserve extension repo URLs so installed extensions remain visible after Reset Data
@@ -366,7 +366,7 @@ class StorageService {
 
       await prefs.clear();
 
-      if (savedRepoUrls != null && savedRepoUrls.isNotEmpty) {
+      if (keepRepos && savedRepoUrls != null && savedRepoUrls.isNotEmpty) {
         await prefs.setStringList(_kExtensionRepoUrls, savedRepoUrls);
       }
 
@@ -409,8 +409,8 @@ class StorageService {
         await extDir.delete(recursive: true);
       }
 
-      // Clear Preferences (Hive + Prefs)
-      await clearPreferences();
+      // Clear Preferences (Hive + Prefs) - For Factory Reset, we do NOT keep repos.
+      await clearPreferences(keepRepos: false);
 
       // Clear Cache Manager (Images)
       try {

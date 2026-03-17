@@ -268,21 +268,28 @@ class JsEngineService {
         final String? callbackId = data['id'];
 
         if (callbackId != null) {
-          compute(_parseHtml, html ?? "").then((doc) {
-            final String id = "doc_${DateTime.now().microsecondsSinceEpoch}";
-            
-            if (_domRegistry.length > 50) {
-              final keys = _domRegistry.keys.toList();
-              for (int i = 0; i < 10; i++) {
-                _domRegistry.remove(keys[i]);
-              }
-            }
-            
-            _domRegistry[id] = doc;
-            _runtime.evaluate("_resolveDartAsync('$callbackId', ${jsonEncode(id)}, false)");
-          }).catchError((e) {
-            _runtime.evaluate("_resolveDartAsync('$callbackId', ${jsonEncode(e.toString())}, true)");
-          });
+          compute(_parseHtml, html ?? "")
+              .then((doc) {
+                final String id =
+                    "doc_${DateTime.now().microsecondsSinceEpoch}";
+
+                if (_domRegistry.length > 50) {
+                  final keys = _domRegistry.keys.toList();
+                  for (int i = 0; i < 10; i++) {
+                    _domRegistry.remove(keys[i]);
+                  }
+                }
+
+                _domRegistry[id] = doc;
+                _runtime.evaluate(
+                  "_resolveDartAsync('$callbackId', ${jsonEncode(id)}, false)",
+                );
+              })
+              .catchError((e) {
+                _runtime.evaluate(
+                  "_resolveDartAsync('$callbackId', ${jsonEncode(e.toString())}, true)",
+                );
+              });
           return null;
         } else {
           // Synchronous fallback (deprecated, but kept for extreme safety if id is missing)
@@ -742,6 +749,8 @@ class JsEngineService {
           headers: finalHeaders,
           responseType: ResponseType.plain,
           validateStatus: (_) => true,
+          sendTimeout: const Duration(seconds: 15),
+          receiveTimeout: const Duration(seconds: 15),
         ),
       );
 
@@ -877,7 +886,7 @@ class JsEngineService {
     dynamic result;
     try {
       result = await completer.future.timeout(
-        const Duration(seconds: 30),
+        const Duration(seconds: 60),
         onTimeout: () {
           _pendingCallbacks.remove(callbackId);
           throw TimeoutException('Timeout executing $functionName');

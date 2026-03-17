@@ -285,10 +285,11 @@ class ActiveProviderNotifier extends Notifier<SkyStreamProvider?> {
         _targetProviderId = null;
         ref.read(providerResolutionLoadingProvider.notifier).set(false);
       } else {
-        // Provider not found (no extensions, or saved provider was uninstalled)
+        // Provider not yet loaded. Keep _targetProviderId set so the listener can pick it up
+        // when extensionManagerProvider updates later.
         state = null;
-        _targetProviderId = null;
-        ref.read(providerResolutionLoadingProvider.notifier).set(false);
+        // Do NOT set _targetProviderId = null here!
+        // We also DO NOT set loading = false yet, as we are waiting for this specific ID.
       }
     }
   }

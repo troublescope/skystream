@@ -62,8 +62,8 @@ class SettingsRepository {
     return _storageService.getPlayerSetting<T>(key, defaultValue: defaultValue);
   }
 
-  Future<void> clearPreferences() async {
-    await _storageService.clearPreferences();
+  Future<void> clearPreferences({bool keepRepos = true}) async {
+    await _storageService.clearPreferences(keepRepos: keepRepos);
   }
 
   Future<void> deleteAllData() async {
