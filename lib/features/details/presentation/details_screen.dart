@@ -16,6 +16,7 @@ import '../../library/presentation/library_provider.dart';
 import 'details_controller.dart';
 import "widgets/details_layout_widgets.dart";
 import "widgets/premium_details_widgets.dart";
+import "../../../shared/widgets/expandable_text.dart";
 
 class DetailsScreen extends ConsumerStatefulWidget {
   final MultimediaItem item;
@@ -245,8 +246,10 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      item.description ?? 'No description available.',
+                    const SizedBox(height: 8),
+                    ExpandableText(
+                      text: item.description ?? 'No description available.',
+                      maxLines: 4,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         fontSize: 16,
                         height: 1.5,
@@ -396,8 +399,10 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
-              Text(
-                item.description ?? 'No description available.',
+              const SizedBox(height: 8),
+              ExpandableText(
+                text: item.description ?? 'No description available.',
+                maxLines: 4,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: Theme.of(context).textTheme.bodyMedium?.color,
                   height: 1.5,
