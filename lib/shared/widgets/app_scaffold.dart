@@ -25,6 +25,11 @@ class _AppScaffoldState extends ConsumerState<AppScaffold> {
     return 0;
   }
 
+  bool _isOnHomeTab(BuildContext context) {
+    final String location = GoRouterState.of(context).uri.toString();
+    return location.startsWith('/home');
+  }
+
   void _onItemTapped(int index, BuildContext context) {
     switch (index) {
       case 0:
@@ -48,6 +53,7 @@ class _AppScaffoldState extends ConsumerState<AppScaffold> {
   @override
   Widget build(BuildContext context) {
     final deviceProfileAsync = ref.watch(deviceProfileProvider);
+    final isHome = _isOnHomeTab(context);
 
     return deviceProfileAsync.when(
       data: (profile) {
@@ -55,45 +61,53 @@ class _AppScaffoldState extends ConsumerState<AppScaffold> {
         // Or if the screen is physically wide enough (like iPads/Tablets in landscape)
         // VirtualMouse cursor only shown on TV, not desktop
         if (profile.isTv || context.isTabletOrLarger) {
-          final sideNavScaffold = Scaffold(
-            body: Row(
-              children: [
-                NavigationRail(
-                  selectedIndex: _calculateSelectedIndex(context),
-                  onDestinationSelected: (index) =>
-                      _onItemTapped(index, context),
-                  labelType: NavigationRailLabelType.all,
-                  groupAlignment: 0.0, // Center
-                  destinations: const [
-                    NavigationRailDestination(
-                      icon: Icon(Icons.home_outlined),
-                      selectedIcon: Icon(Icons.home),
-                      label: Text('Home'),
-                    ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.search),
-                      label: Text('Search'),
-                    ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.dashboard_outlined),
-                      selectedIcon: Icon(Icons.dashboard),
-                      label: Text('Discover'),
-                    ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.library_books_outlined),
-                      selectedIcon: Icon(Icons.library_books),
-                      label: Text('Library'),
-                    ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.settings_outlined),
-                      selectedIcon: Icon(Icons.settings),
-                      label: Text('Settings'),
-                    ),
-                  ],
-                ),
-                const VerticalDivider(thickness: 1, width: 1),
-                Expanded(child: widget.child),
-              ],
+          final sideNavScaffold = PopScope(
+            canPop: isHome,
+            onPopInvokedWithResult: (didPop, result) {
+              if (!didPop) {
+                context.go('/home');
+              }
+            },
+            child: Scaffold(
+              body: Row(
+                children: [
+                  NavigationRail(
+                    selectedIndex: _calculateSelectedIndex(context),
+                    onDestinationSelected: (index) =>
+                        _onItemTapped(index, context),
+                    labelType: NavigationRailLabelType.all,
+                    groupAlignment: 0.0, // Center
+                    destinations: const [
+                      NavigationRailDestination(
+                        icon: Icon(Icons.home_outlined),
+                        selectedIcon: Icon(Icons.home),
+                        label: Text('Home'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.search),
+                        label: Text('Search'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.dashboard_outlined),
+                        selectedIcon: Icon(Icons.dashboard),
+                        label: Text('Discover'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.library_books_outlined),
+                        selectedIcon: Icon(Icons.library_books),
+                        label: Text('Library'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.settings_outlined),
+                        selectedIcon: Icon(Icons.settings),
+                        label: Text('Settings'),
+                      ),
+                    ],
+                  ),
+                  const VerticalDivider(thickness: 1, width: 1),
+                  Expanded(child: widget.child),
+                ],
+              ),
             ),
           );
 
@@ -111,11 +125,19 @@ class _AppScaffoldState extends ConsumerState<AppScaffold> {
         }
 
         // Mobile uses Bottom Navigation
-        return Scaffold(
-          body: widget.child,
-          bottomNavigationBar: CustomBottomNavBar(
-            currentIndex: _calculateSelectedIndex(context),
-            onTap: (index) => _onItemTapped(index, context),
+        return PopScope(
+          canPop: isHome,
+          onPopInvokedWithResult: (didPop, result) {
+            if (!didPop) {
+              context.go('/home');
+            }
+          },
+          child: Scaffold(
+            body: widget.child,
+            bottomNavigationBar: CustomBottomNavBar(
+              currentIndex: _calculateSelectedIndex(context),
+              onTap: (index) => _onItemTapped(index, context),
+            ),
           ),
         );
       },
@@ -125,3 +147,4 @@ class _AppScaffoldState extends ConsumerState<AppScaffold> {
     );
   }
 }
+

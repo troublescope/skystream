@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:screen_brightness/screen_brightness.dart';
@@ -800,7 +801,7 @@ class SkyStreamPlayerControlsState
             PlayerTopBar(
               title: title,
               subtitle: subtitle,
-              onBack: widget.onBackPointer ?? () => Navigator.of(context).pop(),
+              onBack: widget.onBackPointer ?? () => context.pop(),
               isTv: _isTv,
               backFocusNode: _backFocusNode,
             ),
@@ -1042,7 +1043,7 @@ class SkyStreamPlayerControlsState
   Widget _buildLoadingUI({String? title, String? subtitle}) {
     return PlayerLoadingOverlay(
       onDoubleTap: _handleDoubleTap,
-      onBack: () => Navigator.of(context).pop(),
+      onBack: () => context.pop(),
       title: title,
       subtitle: subtitle,
     );

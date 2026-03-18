@@ -1,5 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../core/router/app_router.dart';
 
 import '../../../core/domain/entity/multimedia_item.dart';
 import '../../../shared/widgets/thumbnail_error_placeholder.dart';
@@ -120,7 +122,7 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
             ),
             leading: IconButton(
               icon: const Icon(Icons.arrow_back_rounded),
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => context.pop(),
               style: IconButton.styleFrom(
                 backgroundColor: Colors.black45,
                 foregroundColor: Colors.white,
@@ -303,12 +305,7 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
                 RecommendationsCarousel(
                   items: item.recommendations!,
                   onItemTap: (rec) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => DetailsScreen(item: rec),
-                      ),
-                    );
+                    context.push('/details', extra: DetailsRouteExtra(item: rec));
                   },
                 ),
               ],
@@ -448,12 +445,7 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
                 RecommendationsCarousel(
                   items: item.recommendations!,
                   onItemTap: (rec) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => DetailsScreen(item: rec),
-                      ),
-                    );
+                    context.push('/details', extra: DetailsRouteExtra(item: rec));
                   },
                 ),
               ],

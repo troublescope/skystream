@@ -9,6 +9,8 @@ import 'package:skystream/features/settings/presentation/settings_screen.dart';
 import '../../features/extensions/screens/extensions_screen.dart';
 import '../../features/settings/presentation/developer_options_screen.dart';
 import '../../features/details/presentation/details_screen.dart';
+import '../../features/details/presentation/tmdb_movie_details_screen.dart';
+import '../../features/discover/presentation/view_all_screen.dart';
 import '../../features/player/presentation/player_screen.dart';
 import '../domain/entity/multimedia_item.dart';
 import 'package:skystream/shared/widgets/app_scaffold.dart';
@@ -25,6 +27,32 @@ class PlayerRouteExtra {
   const PlayerRouteExtra({required this.item, required this.videoUrl});
   final MultimediaItem item;
   final String videoUrl;
+}
+
+/// Typed extra for /tmdb-details.
+class TmdbDetailsRouteExtra {
+  const TmdbDetailsRouteExtra({
+    required this.movieId,
+    this.mediaType = 'movie',
+    this.heroTag,
+    this.placeholderPoster,
+  });
+  final int movieId;
+  final String mediaType;
+  final String? heroTag;
+  final String? placeholderPoster;
+}
+
+/// Typed extra for /view-all.
+class ViewAllRouteExtra {
+  const ViewAllRouteExtra({
+    required this.title,
+    required this.initialMediaList,
+    required this.category,
+  });
+  final String title;
+  final List<MultimediaItem> initialMediaList;
+  final ViewAllCategory category;
 }
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -90,6 +118,41 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
+        path: '/tmdb-details',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is! TmdbDetailsRouteExtra) {
+            return const Scaffold(
+              body: Center(child: Text('Invalid navigation. Please go back.')),
+            );
+          }
+          return TmdbMovieDetailsScreen(
+            movieId: extra.movieId,
+            mediaType: extra.mediaType,
+            heroTag: extra.heroTag,
+            placeholderPoster: extra.placeholderPoster,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/view-all',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is! ViewAllRouteExtra) {
+            return const Scaffold(
+              body: Center(child: Text('Invalid navigation. Please go back.')),
+            );
+          }
+          return ViewAllScreen(
+            title: extra.title,
+            initialMediaList: extra.initialMediaList,
+            category: extra.category,
+          );
+        },
+      ),
+      GoRoute(
         path: '/player',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) {
@@ -105,3 +168,4 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+

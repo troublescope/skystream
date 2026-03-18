@@ -111,6 +111,9 @@ class ExtensionManager extends Notifier<List<SkyStreamProvider>> {
       }
       state = newState;
     }
+
+    // Signal that plugin sync is complete
+    ref.read(pluginSyncCompleteProvider.notifier).set(true);
   }
 
   Future<void> updateCustomBaseUrl(String packageName, String? url) async {
@@ -207,6 +210,21 @@ class ProviderResolutionLoadingNotifier extends Notifier<bool> {
   void set(bool value) => state = value;
 }
 
+// Tracks whether the initial plugin sync has completed at least once
+final pluginSyncCompleteProvider =
+    NotifierProvider<PluginSyncCompleteNotifier, bool>(
+      PluginSyncCompleteNotifier.new,
+    );
+
+class PluginSyncCompleteNotifier extends Notifier<bool> {
+  @override
+  bool build() {
+    return false;
+  }
+
+  void set(bool value) => state = value;
+}
+
 // Global definition of activeProviderStateProvider
 final activeProviderStateProvider =
     NotifierProvider<ActiveProviderNotifier, SkyStreamProvider?>(
@@ -235,6 +253,16 @@ class ActiveProviderNotifier extends Notifier<SkyStreamProvider?> {
         if (p != null) {
           state = p;
           _targetProviderId = null;
+          ref.read(providerResolutionLoadingProvider.notifier).set(false);
+        } else if (next.isNotEmpty || ref.read(pluginSyncCompleteProvider)) {
+          // Plugins have loaded (or sync completed with zero plugins)
+          // but the target provider is missing (removed/uninstalled).
+          // Clear the stale setting.
+          debugPrint(
+            "ActiveProviderNotifier: Target provider '$_targetProviderId' not found after plugins loaded. Clearing.",
+          );
+          _targetProviderId = null;
+          ref.read(settingsRepositoryProvider).setActiveProviderId(null);
           ref.read(providerResolutionLoadingProvider.notifier).set(false);
         }
       } else if (state != null) {

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/router/app_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../details/presentation/tmdb_movie_details_screen.dart';
+
 import '../../../../core/utils/responsive_breakpoints.dart';
 import '../../../../shared/widgets/multimedia_card.dart';
 import '../../../../shared/widgets/shimmer_placeholder.dart';
@@ -104,7 +106,7 @@ class _ViewAllScreenState extends ConsumerState<ViewAllScreen> {
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => context.pop(),
           style: IconButton.styleFrom(
             backgroundColor: Colors.black45,
             foregroundColor: Colors.white,
@@ -153,16 +155,12 @@ class _ViewAllScreenState extends ConsumerState<ViewAllScreen> {
               title: itemTitle,
               heroTag: uniqueTag,
               onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => TmdbMovieDetailsScreen(
-                      movieId: item.id,
-                      mediaType: mediaType,
-                      heroTag: uniqueTag,
-                      placeholderPoster: imageUrl,
-                    ),
-                  ),
-                );
+                context.push('/tmdb-details', extra: TmdbDetailsRouteExtra(
+                  movieId: item.id,
+                  mediaType: mediaType,
+                  heroTag: uniqueTag,
+                  placeholderPoster: imageUrl,
+                ));
               },
             );
           },

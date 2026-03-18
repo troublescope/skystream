@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/models/tmdb_details.dart';
 import 'package:intl/intl.dart';
@@ -216,7 +217,7 @@ class _TmdbMovieDetailsScreenState
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => context.pop(),
           style: IconButton.styleFrom(
             backgroundColor: isDark ? Colors.black45 : Colors.white54,
             foregroundColor: textColor,
@@ -313,7 +314,7 @@ class _TmdbMovieDetailsScreenState
                   size: 20,
                 ),
                 padding: EdgeInsets.zero,
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () => context.pop(),
               ),
             ),
           ),

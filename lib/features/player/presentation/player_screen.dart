@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:media_kit/media_kit.dart' hide PlayerState;
@@ -269,7 +270,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
               ),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () => context.pop(),
                 child: const Text("Go Back"),
               ),
             ],

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/router/app_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../../core/utils/layout_constants.dart';
 import '../../../../shared/widgets/shimmer_placeholder.dart';
 import '../../../../shared/widgets/thumbnail_error_placeholder.dart';
-import '../../../details/presentation/tmdb_movie_details_screen.dart';
+
 import '../controllers/discover_search_controller.dart';
 
 class DiscoverSearchDelegate extends SearchDelegate {
@@ -170,15 +172,11 @@ class _SearchSuggestionsListState
             ),
           ),
           onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => TmdbMovieDetailsScreen(
-                  movieId: item.id,
-                  mediaType: mediaType,
-                  heroTag: 'search_${item.id}',
-                ),
-              ),
-            );
+            context.push('/tmdb-details', extra: TmdbDetailsRouteExtra(
+              movieId: item.id,
+              mediaType: mediaType,
+              heroTag: 'search_${item.id}',
+            ));
           },
         );
       },
@@ -324,16 +322,12 @@ class _SearchResultsGridState extends ConsumerState<_SearchResultsGrid> {
 
         return GestureDetector(
           onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => TmdbMovieDetailsScreen(
-                  movieId: id,
-                  mediaType: mediaType,
-                  heroTag: uniqueTag,
-                  placeholderPoster: imageUrl,
-                ),
-              ),
-            );
+            context.push('/tmdb-details', extra: TmdbDetailsRouteExtra(
+              movieId: id,
+              mediaType: mediaType,
+              heroTag: uniqueTag,
+              placeholderPoster: imageUrl,
+            ));
           },
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

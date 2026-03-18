@@ -1,10 +1,12 @@
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/router/app_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/utils/layout_constants.dart';
 import '../../../../shared/widgets/cards_wrapper.dart';
-import '../../../details/presentation/tmdb_movie_details_screen.dart';
+
 import '../../../../shared/widgets/thumbnail_error_placeholder.dart';
 import '../../../../core/domain/entity/multimedia_item.dart';
 
@@ -188,15 +190,11 @@ class _DiscoverCarouselState extends State<DiscoverCarousel> {
     // fallback to title check.
     final String mediaType = movie.mediaType;
 
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => TmdbMovieDetailsScreen(
-          movieId: movie.id,
-          mediaType: mediaType,
-          heroTag: 'hero_${movie.id}',
-        ),
-      ),
-    );
+    context.push('/tmdb-details', extra: TmdbDetailsRouteExtra(
+      movieId: movie.id,
+      mediaType: mediaType,
+      heroTag: 'hero_${movie.id}',
+    ));
   }
 
   Widget _buildCarouselItem(

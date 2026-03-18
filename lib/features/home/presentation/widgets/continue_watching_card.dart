@@ -139,7 +139,9 @@ class ContinueWatchingCard extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Row(
+                        Wrap(
+                          spacing: 0,
+                          runSpacing: 4,
                           children: [
                             if (item.provider != null && item.provider!.isNotEmpty)
                               Container(

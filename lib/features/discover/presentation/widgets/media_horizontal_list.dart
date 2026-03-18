@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/layout_constants.dart';
 import '../../../../shared/widgets/cards_wrapper.dart';
-import '../../../details/presentation/tmdb_movie_details_screen.dart';
+
 import '../../../../shared/widgets/desktop_scroll_wrapper.dart';
 import '../../../../core/utils/responsive_breakpoints.dart';
 import '../../../../shared/widgets/multimedia_card.dart';
@@ -94,15 +96,11 @@ class _MediaHorizontalListState extends State<MediaHorizontalList> {
               if (widget.showViewAll)
                 CardsWrapper(
                   onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => ViewAllScreen(
-                          title: widget.title,
-                          initialMediaList: widget.mediaList,
-                          category: widget.category,
-                        ),
-                      ),
-                    );
+                    context.push('/view-all', extra: ViewAllRouteExtra(
+                      title: widget.title,
+                      initialMediaList: widget.mediaList,
+                      category: widget.category,
+                    ));
                   },
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
@@ -176,16 +174,12 @@ class _MediaHorizontalListState extends State<MediaHorizontalList> {
                     if (widget.onTap != null) {
                       widget.onTap!(item);
                     } else {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => TmdbMovieDetailsScreen(
-                            movieId: item.id,
-                            mediaType: mediaType,
-                            heroTag: uniqueTag,
-                            placeholderPoster: imageUrl,
-                          ),
-                        ),
-                      );
+                      context.push('/tmdb-details', extra: TmdbDetailsRouteExtra(
+                        movieId: item.id,
+                        mediaType: mediaType,
+                        heroTag: uniqueTag,
+                        placeholderPoster: imageUrl,
+                      ));
                     }
                   },
                 );

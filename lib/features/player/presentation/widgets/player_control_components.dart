@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:media_kit/media_kit.dart';
 import '../../../../shared/widgets/custom_widgets.dart';
 import 'player_stream_widgets.dart';
@@ -44,7 +45,7 @@ class PlayerTopBar extends StatelessWidget {
               CustomButton(
                 showFocusHighlight: isTv,
                 focusNode: backFocusNode,
-                onPressed: onBack ?? () => Navigator.of(context).pop(),
+                onPressed: onBack ?? () => context.pop(),
                 child: const Icon(
                   Icons.arrow_back,
                   color: Colors.white,

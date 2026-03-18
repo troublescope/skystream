@@ -1,12 +1,14 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/router/app_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:skystream/core/domain/entity/multimedia_item.dart';
 import 'package:skystream/core/extensions/extension_manager.dart';
 import 'package:skystream/core/utils/image_fallbacks.dart';
 import 'package:skystream/features/search/presentation/search_provider.dart';
 import '../../../../shared/widgets/cards_wrapper.dart';
-import '../details_screen.dart';
+
 import '../../../../shared/widgets/desktop_scroll_wrapper.dart';
 import '../../../../core/utils/layout_constants.dart';
 import '../../../../shared/widgets/shimmer_placeholder.dart';
@@ -157,12 +159,7 @@ class _ProviderSearchSectionState extends ConsumerState<ProviderSearchSection> {
                               )
                             : item.contentType,
                       );
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              DetailsScreen(item: enrichedItem),
-                        ),
-                      );
+                      context.push('/details', extra: DetailsRouteExtra(item: enrichedItem));
                     },
                     child: SizedBox(
                       width: 220,
