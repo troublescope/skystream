@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -27,7 +28,9 @@ class PlaybackLauncher {
 
     if (settings.preferredPlayer != null) {
       if (baseItem.url.isNotEmpty) {
-        _ref.read(detailsControllerProvider(baseItem.url).notifier).setLaunching(true);
+        _ref
+            .read(detailsControllerProvider(baseItem.url).notifier)
+            .setLaunching(true);
       }
       _launchExternal(
         context,
@@ -36,16 +39,15 @@ class PlaybackLauncher {
         settings.preferredPlayer!,
       ).whenComplete(() {
         if (baseItem.url.isNotEmpty) {
-          _ref.read(detailsControllerProvider(baseItem.url).notifier).setLaunching(false);
+          _ref
+              .read(detailsControllerProvider(baseItem.url).notifier)
+              .setLaunching(false);
         }
       });
     } else {
       context.push(
         '/player',
-        extra: PlayerRouteExtra(
-          item: detailedItem ?? baseItem,
-          videoUrl: url,
-        ),
+        extra: PlayerRouteExtra(item: detailedItem ?? baseItem, videoUrl: url),
       );
     }
   }
@@ -83,7 +85,7 @@ class PlaybackLauncher {
             (p) => p.packageName == val || p.name == val,
           );
         } catch (e) {
-          debugPrint('PlaybackLauncher.launch: $e');
+          if (kDebugMode) debugPrint('PlaybackLauncher.launch: $e');
         }
       }
       provider ??= _ref.read(activeProviderStateProvider);
@@ -117,10 +119,18 @@ class PlaybackLauncher {
       }
 
       if (streams.length == 1) {
-        await _launchStream(context, streams.first, item, episodeDataUrl, playerId);
+        await _launchStream(
+          context,
+          streams.first,
+          item,
+          episodeDataUrl,
+          playerId,
+        );
       } else {
         if (item.url.isNotEmpty) {
-           _ref.read(detailsControllerProvider(item.url).notifier).setLaunching(false);
+          _ref
+              .read(detailsControllerProvider(item.url).notifier)
+              .setLaunching(false);
         }
         _showSourcePicker(context, streams, item, episodeDataUrl, playerId);
       }
@@ -148,7 +158,9 @@ class PlaybackLauncher {
     if (stream.url.startsWith("magnet:") ||
         stream.url.endsWith(".torrent") ||
         (stream.url.startsWith("/") && stream.source.contains("Torrent"))) {
-      final torrentUrl = await _ref.read(torrentServiceProvider).getStreamUrl(stream.url);
+      final torrentUrl = await _ref
+          .read(torrentServiceProvider)
+          .getStreamUrl(stream.url);
       if (torrentUrl != null) {
         playUrl = torrentUrl;
       }
