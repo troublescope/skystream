@@ -271,8 +271,10 @@ class MultimediaItem {
 
   // Compatibility getters for TmdbItem migration
   int get id => tmdbId ?? 0;
-  String get mediaType =>
-      contentType == MultimediaContentType.series ? 'tv' : 'movie';
+  String get mediaType {
+    return contentType.name.toUpperCase();
+  }
+
   String get backdropImageUrl => bannerUrl ?? posterUrl;
   String get posterImageUrl => posterUrl;
   String get thumbnailImageUrl => posterUrl;
