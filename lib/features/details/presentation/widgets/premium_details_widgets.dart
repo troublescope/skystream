@@ -7,15 +7,16 @@ import 'package:skystream/shared/widgets/cards_wrapper.dart';
 import 'package:skystream/shared/widgets/shimmer_placeholder.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:skystream/shared/widgets/thumbnail_error_placeholder.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'details_layout_widgets.dart';
 
-class MetadataBar extends StatelessWidget {
+class MetadataBar extends ConsumerWidget {
   final MultimediaItem item;
   final bool isLoading;
   const MetadataBar({super.key, required this.item, this.isLoading = false});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     // theme and context used in helper methods
     final contentType = item.contentType;
     final showTypeBadge =
@@ -39,7 +40,7 @@ class MetadataBar extends StatelessWidget {
           ShimmerPlaceholder.rectangular(
             width: 60,
             height: 20,
-            borderRadius: 6,
+            borderRadius: 4,
           ),
 
         if (item.year != null)
@@ -263,6 +264,7 @@ class NextAiringWidget extends StatelessWidget {
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: Theme.of(context).colorScheme.primary,
               fontWeight: FontWeight.bold,
+              fontSize: 14,
             ),
           ),
         ],

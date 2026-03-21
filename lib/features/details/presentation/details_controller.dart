@@ -9,6 +9,8 @@ import '../../../../core/storage/history_repository.dart';
 import '../../library/presentation/library_provider.dart';
 import '../../library/presentation/history_provider.dart';
 import 'playback_launcher.dart';
+import '../../../core/services/download_service.dart';
+import 'downloaded_file_provider.dart';
 
 class DetailsState {
   final AsyncValue<MultimediaItem?> details;
@@ -68,6 +70,34 @@ class DetailsController extends Notifier<DetailsState> {
 
   @override
   DetailsState build() {
+    ref.listen(activeDownloadsProvider, (prev, next) {
+      final details = state.details.asData?.value;
+      if (details == null) return;
+
+      // Detect URLs that were active but are no longer active (completed/failed/canceled)
+      final previousSet = prev ?? <String>{};
+      final finishingUrls = previousSet.difference(next);
+
+      if (finishingUrls.isNotEmpty) {
+        if (kDebugMode) {
+          debugPrint('[DetailsController] Re-checking status immediately after download finished: $finishingUrls');
+        }
+
+        // Re-check specific item if its URL finished
+        if (finishingUrls.contains(details.url)) {
+          ref.read(downloadedFilesProvider.notifier).checkFile(details);
+        }
+
+        // Re-check episodes
+        final episodes = details.episodes ?? [];
+        for (final ep in episodes) {
+          if (finishingUrls.contains(ep.url)) {
+            ref.read(downloadedFilesProvider.notifier).checkFile(details, episode: ep);
+          }
+        }
+      }
+    });
+
     ref.listen(watchHistoryProvider, (prev, next) {
       final details = state.details.asData?.value;
       if (details != null) {
@@ -166,6 +196,7 @@ class DetailsController extends Notifier<DetailsState> {
         );
         state = state.copyWith(
           details: AsyncData(withProvider.copyWith(episodes: sortedEpisodes)),
+          item: withProvider.copyWith(episodes: sortedEpisodes),
         );
       } else {
         throw Exception("No provider selected or found for this item");
@@ -292,7 +323,15 @@ class DetailsController extends Notifier<DetailsState> {
     BuildContext context,
     MultimediaItem details, {
     Episode? specificEpisode,
+    String? overrideUrl,
   }) {
+    if (overrideUrl != null) {
+      ref
+          .read(playbackLauncherProvider)
+          .play(context, overrideUrl, baseItem: details);
+      return;
+    }
+
     if (specificEpisode != null) {
       ref
           .read(playbackLauncherProvider)

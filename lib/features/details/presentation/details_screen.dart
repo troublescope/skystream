@@ -7,7 +7,7 @@ import '../../../core/domain/entity/multimedia_item.dart';
 import '../../../shared/widgets/thumbnail_error_placeholder.dart';
 import '../../../core/utils/image_fallbacks.dart';
 
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:skystream/core/utils/layout_constants.dart';
 import 'package:skystream/core/utils/responsive_breakpoints.dart';
 
@@ -47,8 +47,9 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
       if (!widget.autoPlay || _didTriggerAutoPlay) return;
       final prevState = prev ?? const DetailsState();
       final nextState = next;
-      if (prevState.details.isLoading != true || !nextState.details.hasValue)
+      if (prevState.details.isLoading != true || !nextState.details.hasValue) {
         return;
+      }
       final item = nextState.details.value!;
       _didTriggerAutoPlay = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {

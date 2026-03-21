@@ -110,7 +110,6 @@ class PlayerController extends Notifier<PlayerState> {
   late String _videoUrl;
   Timer? _torrentPollTimer;
   bool _isPolling = false;
-  bool _isDisposed = false;
 
   // Track last saved position for threshold-based saving
   Duration _lastSavedPosition = Duration.zero;
@@ -141,7 +140,6 @@ class PlayerController extends Notifier<PlayerState> {
       _playingSub?.cancel();
       _positionSub?.cancel();
       _bufferingSub?.cancel();
-      _isDisposed = true;
     });
     return const PlayerState();
   }
@@ -404,7 +402,8 @@ class PlayerController extends Notifier<PlayerState> {
   Future<bool> _handleSpecialProviders() async {
     if (_item.provider == 'Remote' ||
         _item.provider == 'Local' ||
-        _item.provider == 'Torrent') {
+        _item.provider == 'Torrent' ||
+        (_videoUrl.startsWith('/') && File(_videoUrl).existsSync())) {
       final isTorrent =
           _item.provider == 'Torrent' ||
           _videoUrl.startsWith("magnet:") ||

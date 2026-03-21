@@ -55,10 +55,11 @@ class ViewAllRouteExtra {
   final ViewAllCategory category;
 }
 
+final rootNavigatorKey = GlobalKey<NavigatorState>();
+final shellNavigatorKey = GlobalKey<NavigatorState>();
+
 final appRouterProvider = Provider<GoRouter>((ref) {
   ref.keepAlive();
-  final rootNavigatorKey = GlobalKey<NavigatorState>();
-  final shellNavigatorKey = GlobalKey<NavigatorState>();
 
   return GoRouter(
     initialLocation: '/home',

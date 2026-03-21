@@ -1,13 +1,21 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:background_downloader/background_downloader.dart';
+import 'package:collection/collection.dart';
+import '../downloaded_file_provider.dart';
 
 import 'package:skystream/core/domain/entity/multimedia_item.dart';
-import '../../../../core/storage/history_repository.dart';
+import 'package:skystream/core/storage/history_repository.dart';
 import 'package:skystream/core/utils/layout_constants.dart';
 import 'package:skystream/shared/widgets/custom_widgets.dart';
 import '../details_controller.dart';
 import 'package:skystream/core/extensions/extension_manager.dart';
+import 'package:skystream/core/services/download_service.dart';
+import '../download_launcher.dart';
+import 'download_progress_dialog.dart';
+import 'download_management_dialog.dart';
 import 'episode_card.dart';
 
 class DetailsSeasonListWrapper extends ConsumerWidget {
@@ -57,7 +65,7 @@ class DetailsSeasonListWrapper extends ConsumerWidget {
   }
 }
 
-class DetailsActionButtons extends ConsumerWidget {
+class DetailsActionButtons extends HookConsumerWidget {
   final MultimediaItem item;
   final MultimediaItem? details;
   final String itemUrl;
@@ -143,28 +151,109 @@ class DetailsActionButtons extends ConsumerWidget {
         details?.episodes?.length == 1 &&
         !isLivestream;
 
+    final episodeUrl = details?.episodes?.firstOrNull?.url ?? item.url;
+    final activeDownloads = ref.watch(activeDownloadsProvider);
+    final isDownloading = activeDownloads.contains(episodeUrl);
+    final progressMap = ref.watch(downloadProgressProvider);
+    final downloadProgressData = progressMap[episodeUrl] ?? progressMap[item.url];
+    final downloadProgress = downloadProgressData?.progress ?? 0.0;
+
+    final downloadedFile = ref.watch(downloadedFilesProvider)[episodeUrl];
+
+    // Check for downloaded file on load
+    useEffect(() {
+      if (details != null && !isDownloading) {
+        Future.microtask(() {
+          ref.read(downloadedFilesProvider.notifier).checkFile(
+                details!,
+                episode: details?.episodes?.firstWhereOrNull((e) => e.url == episodeUrl),
+              );
+        });
+      }
+      return null;
+    }, [details, episodeUrl, isDownloading]);
+
     final downloadBtn = !showDownload
         ? const SizedBox.shrink()
-        : CustomButton(
-            isPrimary: false,
-            isOutlined: true,
-            onPressed: () {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('Coming soon')));
-            },
-            child: const Padding(
-              padding: EdgeInsets.all(LayoutConstants.spacingMd),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.download_rounded),
-                  SizedBox(width: LayoutConstants.spacingXs),
-                  Text('Download'),
-                ],
-              ),
-            ),
-          );
+        : downloadedFile != null
+            ? CustomButton(
+                isPrimary: false,
+                isOutlined: true,
+                onPressed: () {
+                  DownloadManagementDialog.show(
+                    context,
+                    details ?? item,
+                    downloadedFile,
+                    episode: details?.episodes?.firstWhereOrNull((e) => e.url == episodeUrl),
+                  );
+                },
+                child: const Padding(
+                  padding: EdgeInsets.all(LayoutConstants.spacingMd),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_circle_rounded, color: Colors.green),
+                      SizedBox(width: LayoutConstants.spacingXs),
+                      Text('Downloaded'),
+                    ],
+                  ),
+                ),
+              )
+            : CustomButton(
+                isPrimary: false,
+                isOutlined: true,
+                onPressed: isDownloading
+                    ? () => DownloadProgressDialog.show(
+                          context,
+                          details?.title ?? item.title,
+                          episodeUrl,
+                        )
+                    : () {
+                        ref.read(downloadLauncherProvider).launch(
+                              context,
+                              details ?? item,
+                              episodeUrl: episodeUrl,
+                            );
+                      },
+                child: Padding(
+                  padding: const EdgeInsets.all(LayoutConstants.spacingMd),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: isDownloading
+                        ? [
+                            SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: downloadProgressData?.status == TaskStatus.paused
+                                  ? Icon(
+                                      Icons.pause_rounded,
+                                      size: 18,
+                                      color: Theme.of(context).colorScheme.primary,
+                                    )
+                                  : CircularProgressIndicator(
+                                      value: downloadProgress > 0
+                                          ? downloadProgress
+                                          : null,
+                                      strokeWidth: 2,
+                                    ),
+                            ),
+                            const SizedBox(width: LayoutConstants.spacingXs),
+                            Text(
+                              downloadProgressData?.status == TaskStatus.paused
+                                  ? 'Paused'
+                                  : downloadProgress > 0
+                                      ? '${(downloadProgress * 100).toInt()}%'
+                                      : 'Starting...',
+                            ),
+                          ]
+                        : const [
+                            Icon(Icons.download_rounded),
+                            SizedBox(width: LayoutConstants.spacingXs),
+                            Text('Download'),
+                          ],
+                  ),
+                ),
+              );
 
     Widget progressWidget = const SizedBox.shrink();
     if (pos > 0 && dur > 0 && !isLivestream) {
@@ -350,7 +439,7 @@ class SliverDetailsDesktopEpisodeGrid extends ConsumerWidget {
                                 ? EpisodeCard(
                                     episode: rowEpisodes[i],
                                     parentItem: parentItem,
-                                  )
+                                  ) as Widget
                                 : const SizedBox.shrink(),
                           ),
                         ),
@@ -438,7 +527,7 @@ class SliverDetailsEpisodeList extends ConsumerWidget {
           separatorBuilder: (_, _) => const SizedBox(height: 12),
           itemBuilder: (context, index) {
             final ep = displayedEpisodes[index];
-            return EpisodeCard(episode: ep, parentItem: parentItem);
+            return EpisodeCard(episode: ep, parentItem: parentItem) as Widget;
           },
         ),
       ],

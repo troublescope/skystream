@@ -1,0 +1,650 @@
+import 'dart:io';
+import 'package:background_downloader/background_downloader.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:collection/collection.dart';
+import 'package:permission_handler/permission_handler.dart'
+    hide PermissionStatus;
+import 'package:device_info_plus/device_info_plus.dart';
+
+import '../domain/entity/multimedia_item.dart';
+import '../network/dio_client_provider.dart';
+
+final downloadServiceProvider = Provider<DownloadService>((ref) {
+  return DownloadService(ref);
+});
+
+class DownloadProgressData {
+  final String taskId;
+  final double progress;
+  final double networkSpeed; // MB/s
+  final Duration timeRemaining;
+  final int totalSize; // Bytes
+  final TaskStatus status;
+
+  DownloadProgressData({
+    required this.taskId,
+    required double progress,
+    required this.networkSpeed,
+    required this.timeRemaining,
+    required this.status,
+    this.totalSize = -1,
+  }) : progress = progress.clamp(0.0, 1.0);
+
+  String get downloadedSizeString {
+    if (totalSize <= 0) return "Calculating...";
+    if (progress <= 0) return "0 MB";
+    final double downloaded = (totalSize * progress) / (1024 * 1024);
+    if (downloaded > 1024) {
+      return "${(downloaded / 1024).toStringAsFixed(2)} GB";
+    }
+    return "${downloaded.toStringAsFixed(2)} MB";
+  }
+
+  String get totalSizeString {
+    if (totalSize <= 0) return "Unknown";
+    final double total = totalSize / (1024 * 1024);
+    if (total > 1024) return "${(total / 1024).toStringAsFixed(2)} GB";
+    return "${total.toStringAsFixed(2)} MB";
+  }
+
+  String get speedString {
+    if (status == TaskStatus.paused) return "Paused";
+    if (progress >= 1.0) return "Done";
+    if (networkSpeed < 0) return "Calculating...";
+    if (networkSpeed == 0) return "0 MB/s";
+
+    if (networkSpeed < 1.0) {
+      return "${(networkSpeed * 1024).toStringAsFixed(2)} KB/s";
+    }
+    return "${networkSpeed.toStringAsFixed(2)} MB/s";
+  }
+
+  String get timeRemainingString {
+    if (status == TaskStatus.paused) return "---";
+    if (progress >= 1.0) return "Finished";
+    if (timeRemaining.inSeconds <= 0) return "Calculating...";
+    if (timeRemaining.inHours > 0) {
+      return "${timeRemaining.inHours}h ${timeRemaining.inMinutes % 60}m remaining";
+    }
+    if (timeRemaining.inMinutes > 0) {
+      return "${timeRemaining.inMinutes}m ${timeRemaining.inSeconds % 60}s remaining";
+    }
+    return "${timeRemaining.inSeconds}s remaining";
+  }
+}
+
+final downloadProgressProvider =
+    NotifierProvider<
+      DownloadProgressNotifier,
+      Map<String, DownloadProgressData>
+    >(DownloadProgressNotifier.new);
+
+class DownloadProgressNotifier
+    extends Notifier<Map<String, DownloadProgressData>> {
+  @override
+  Map<String, DownloadProgressData> build() => {};
+
+  void update(String url, DownloadProgressData data) {
+    state = {...state, url: data};
+  }
+
+  void remove(String url) {
+    state = {...state}..remove(url);
+  }
+}
+
+final activeDownloadsProvider =
+    NotifierProvider<ActiveDownloadsNotifier, Set<String>>(
+      ActiveDownloadsNotifier.new,
+    );
+
+class ActiveDownloadsNotifier extends Notifier<Set<String>> {
+  @override
+  Set<String> build() => {};
+
+  void add(String url) => state = {...state, url};
+  void remove(String url) => state = {...state}..remove(url);
+}
+
+class DownloadService {
+  final Ref _ref;
+  final Dio _dio;
+  final Set<String> _cancellingUrls = {};
+
+  DownloadService(this._ref) : _dio = _ref.read(dioClientProvider);
+
+  Future<void> init() async {
+    // 1. Configure the downloader (chainable API)
+    await FileDownloader()
+        .configure(
+          globalConfig: [(Config.requestTimeout, const Duration(seconds: 100))],
+          androidConfig: [(Config.runInForeground, Config.always)],
+          iOSConfig: [(Config.excludeFromCloudBackup, Config.always)],
+        )
+        .then((result) => debugPrint('Configuration result = $result'));
+
+    // 2. Register callbacks and configure notifications
+    final notificationConfig = TaskNotification(
+      '{displayName}',
+      Platform.isIOS
+          ? 'Downloading...'
+          : '{progress} • {networkSpeed} • {timeRemaining}',
+    );
+
+    FileDownloader()
+        .registerCallbacks(
+          taskNotificationTapCallback: _myNotificationTapCallback,
+        )
+        .configureNotification(
+          running: notificationConfig,
+          complete: const TaskNotification(
+            '{displayName}',
+            'Download finished',
+          ),
+          error: const TaskNotification('{displayName}', 'Download failed'),
+          paused: const TaskNotification('{displayName}', 'Download paused'),
+          progressBar: !Platform.isIOS, // Simplified for iOS
+          tapOpensFile: true,
+        )
+        .configureNotificationForGroup(
+          'downloads',
+          running: notificationConfig,
+          complete: const TaskNotification(
+            '{displayName}',
+            'Download finished',
+          ),
+          error: const TaskNotification('{displayName}', 'Download failed'),
+          paused: const TaskNotification('{displayName}', 'Download paused'),
+          progressBar: !Platform.isIOS,
+        );
+
+    // 3. Re-check Permission status (native API)
+    final status = await FileDownloader().permissions.status(
+      PermissionType.notifications,
+    );
+    if (status != PermissionStatus.granted) {
+      await FileDownloader().permissions.request(PermissionType.notifications);
+    }
+
+    // 4. Listen to updates and process (Reactive Pattern)
+    FileDownloader().updates.listen((update) {
+      final trackingUrl = update.task.metaData.isNotEmpty
+          ? update.task.metaData
+          : update.task.url;
+
+      if (_cancellingUrls.contains(trackingUrl)) return;
+
+      switch (update) {
+        case TaskProgressUpdate():
+          final current = _ref.read(downloadProgressProvider)[trackingUrl];
+          
+          // If we already marked it as complete/failed, ignore lingering progress updates
+          if (current != null && 
+              (current.status == TaskStatus.complete || 
+               current.status == TaskStatus.failed)) {
+            return;
+          }
+
+          final progressData = DownloadProgressData(
+            taskId: update.task.taskId,
+            progress: update.progress >= 0
+                ? update.progress
+                : (current?.progress ?? 0),
+            networkSpeed: update.networkSpeed,
+            timeRemaining: update.timeRemaining,
+            totalSize: update.expectedFileSize > 0
+                ? update.expectedFileSize
+                : (current?.totalSize ?? -1),
+            status: TaskStatus.running,
+          );
+
+          // Only add to active downloads if it's not finished
+          if (update.progress < 1.0) {
+            _ref.read(activeDownloadsProvider.notifier).add(trackingUrl);
+          } else {
+            // Force removal from active downloads if it's hitting 100%
+            _ref.read(activeDownloadsProvider.notifier).remove(trackingUrl);
+          }
+          
+          _ref
+              .read(downloadProgressProvider.notifier)
+              .update(trackingUrl, progressData);
+
+        case TaskStatusUpdate():
+          if (kDebugMode) {
+            debugPrint(
+              '[DownloadService] Status: ${update.status} for $trackingUrl',
+            );
+          }
+          // Update status in progress map
+          final current = _ref.read(downloadProgressProvider)[trackingUrl];
+          if (current != null) {
+            _ref
+                .read(downloadProgressProvider.notifier)
+                .update(
+                  trackingUrl,
+                  DownloadProgressData(
+                    taskId: current.taskId,
+                    progress: current.progress,
+                    networkSpeed: update.status == TaskStatus.running
+                        ? current.networkSpeed
+                        : 0,
+                    timeRemaining: update.status == TaskStatus.running
+                        ? current.timeRemaining
+                        : Duration.zero,
+                    totalSize: current.totalSize,
+                    status: update.status,
+                  ),
+                );
+          }
+          _handleStatusUpdate(update, trackingUrl);
+      }
+    });
+
+    // 5. Catch up on any running tasks and database tracking
+    await FileDownloader().trackTasks();
+    await FileDownloader().start();
+
+    // 6. Bridge Database Records to Riverpod (Persistence after restart)
+    final records = await FileDownloader().database.allRecords();
+    for (final record in records) {
+      // Only recover paused tasks here.
+      // Active/Enqueued tasks will be automatically picked up by FileDownloader().updates
+      // if they are still running or re-started by trackTasks().
+      if (record.status == TaskStatus.paused) {
+        final trackingUrl = record.task.metaData.isNotEmpty
+            ? record.task.metaData
+            : record.task.url;
+
+        _ref.read(activeDownloadsProvider.notifier).add(trackingUrl);
+        _ref
+            .read(downloadProgressProvider.notifier)
+            .update(
+              trackingUrl,
+              DownloadProgressData(
+                taskId: record.task.taskId,
+                progress: record.progress,
+                networkSpeed: 0,
+                timeRemaining: Duration.zero,
+                status: record.status,
+                totalSize: record.expectedFileSize,
+              ),
+            );
+      }
+    }
+
+    // iOS Background Sync
+    if (Platform.isIOS) {
+      await FileDownloader().resumeFromBackground();
+    }
+  }
+
+  /// Process tapping on a notification
+  void _myNotificationTapCallback(
+    Task task,
+    NotificationType notificationType,
+  ) {
+    if (kDebugMode) {
+      debugPrint(
+        '[DownloadService] Tapped $notificationType for ${task.taskId}',
+      );
+    }
+  }
+
+  void _handleStatusUpdate(TaskStatusUpdate update, String trackingUrl) {
+    if (update.status == TaskStatus.complete) {
+      _ref.read(activeDownloadsProvider.notifier).remove(trackingUrl);
+      _ref.read(downloadProgressProvider.notifier).remove(trackingUrl);
+    } else if (update.status == TaskStatus.failed ||
+        update.status == TaskStatus.canceled) {
+      _ref.read(activeDownloadsProvider.notifier).remove(trackingUrl);
+    }
+  }
+
+  Future<void> cancelDownload(String taskId, String trackingUrl) async {
+    _cancellingUrls.add(trackingUrl);
+    try {
+      await FileDownloader().cancelTasksWithIds([taskId]);
+      _ref.read(activeDownloadsProvider.notifier).remove(trackingUrl);
+      _ref.read(downloadProgressProvider.notifier).remove(trackingUrl);
+    } finally {
+      // Small delay to let final updates clear
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _cancellingUrls.remove(trackingUrl);
+      });
+    }
+  }
+
+  Future<void> pauseDownload(String taskId) async {
+    final task = await FileDownloader().taskForId(taskId);
+    if (task is DownloadTask) {
+      await FileDownloader().pause(task);
+    }
+  }
+
+  Future<void> resumeDownload(String taskId) async {
+    final task = await FileDownloader().taskForId(taskId);
+    if (task is DownloadTask) {
+      await FileDownloader().resume(task);
+    }
+  }
+
+  Future<DownloadMetadata?> getMetadata(
+    String url, {
+    Map<String, String>? headers,
+  }) async {
+    try {
+      // 1. Try HEAD request first
+      int? size;
+      String? mimeType;
+
+      try {
+        final response = await _dio
+            .head(
+              url,
+              options: Options(headers: headers, followRedirects: true),
+            )
+            .timeout(const Duration(seconds: 10));
+
+        final contentLength = response.headers.value('content-length');
+        if (contentLength != null) {
+          size = int.tryParse(contentLength);
+        }
+        mimeType = response.headers.value('content-type');
+      } catch (e) {
+        // HEAD failed, will try GET fallback
+      }
+
+      // 2. Fallback to GET with Range if size unknown
+      if (size == null) {
+        try {
+          final getResponse = await _dio
+              .get(
+                url,
+                options: Options(
+                  headers: {...?headers, 'Range': 'bytes=0-0'},
+                  followRedirects: true,
+                ),
+              )
+              .timeout(const Duration(seconds: 10));
+
+          final rangeContentLength = getResponse.headers.value('content-range');
+          if (rangeContentLength != null) {
+            final totalSize = rangeContentLength.split('/').last;
+            size = int.tryParse(totalSize);
+          }
+          mimeType ??= getResponse.headers.value('content-type');
+        } catch (e) {
+          // GET fallback failed
+        }
+      }
+
+      return DownloadMetadata(size: size, mimeType: mimeType);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<bool> startDownload({
+    required String url,
+    required String filename,
+    required String directory, // Relative for mobile/mac, absolute for others
+    String? trackingUrl,
+    Map<String, String>? headers,
+  }) async {
+    if (kDebugMode) {
+      debugPrint('[DownloadService] startDownload called');
+      debugPrint('[DownloadService] - URL: $url');
+      debugPrint('[DownloadService] - Tracking URL: $trackingUrl');
+      debugPrint('[DownloadService] - Filename: $filename');
+      debugPrint('[DownloadService] - Directory: $directory');
+    }
+
+    // Industry Standard: Ask for battery optimization when a real download starts
+    await requestIgnoreBatteryOptimizations();
+
+    // Request permission on Android (Version Aware)
+    if (Platform.isAndroid) {
+      final androidInfo = await DeviceInfoPlugin().androidInfo;
+      if (androidInfo.version.sdkInt <= 32) {
+        // For Android 12 and below, we need storage permission for some public paths
+        await Permission.storage.request();
+      }
+    }
+
+    final isAndroid = Platform.isAndroid;
+    final isIOS = Platform.isIOS;
+
+    // Prevention: Check if task is ALREADY running (using database for robustness)
+    final records = await FileDownloader().database.allRecords();
+    final existingRecord = records.firstWhereOrNull(
+      (r) =>
+          (r.status == TaskStatus.enqueued ||
+              r.status == TaskStatus.running ||
+              r.status == TaskStatus.paused) &&
+          (r.task.metaData.isNotEmpty ? r.task.metaData : r.task.url) ==
+              (trackingUrl ?? url),
+    );
+
+    if (existingRecord != null) {
+      if (kDebugMode) {
+        debugPrint(
+          '[DownloadService] Task already exists in database with status: ${existingRecord.status}',
+        );
+      }
+
+      // If it was paused, resume it!
+      if (existingRecord.status == TaskStatus.paused) {
+        if (kDebugMode) {
+          debugPrint('[DownloadService] Auto-resuming paused task.');
+        }
+        if (existingRecord.task is DownloadTask) {
+          await FileDownloader().resume(existingRecord.task as DownloadTask);
+        }
+      }
+
+      _ref.read(activeDownloadsProvider.notifier).add(trackingUrl ?? url);
+      return true;
+    }
+
+    // Path Logic:
+    // Android/Desktop: use BaseDirectory.root with absolute path.
+    // iOS: use BaseDirectory.applicationDocuments with relative path for sandbox safety.
+    BaseDirectory baseDir;
+    String taskDirectory;
+
+    if (isIOS) {
+      baseDir = BaseDirectory.applicationDocuments;
+      // On iOS, 'directory' (from getDownloadPath(absolute: false)) is relative: "Skystream/Title"
+      taskDirectory = directory;
+    } else {
+      // Android, Windows, macOS, Linux: use absolute paths with BaseDirectory.root
+      baseDir = BaseDirectory.root;
+      if (isAndroid) {
+        taskDirectory = '${(await _getPublicDownloadsPath())}/$directory';
+      } else {
+        // Desktop: directory is already absolute (e.g. /Users/akash/Downloads/Skystream/Title)
+        taskDirectory = directory;
+      }
+    }
+
+    final task = DownloadTask(
+      url: url,
+      filename: filename,
+      displayName: filename,
+      baseDirectory: baseDir,
+      directory: taskDirectory,
+      headers: headers ?? {},
+      updates: Updates.statusAndProgress,
+      retries: 3, // Align with example
+      allowPause: true,
+      metaData: trackingUrl ?? url,
+    );
+
+    if (kDebugMode) debugPrint('[DownloadService] Enqueuing task...');
+
+    // Create the directory if it doesn't exist
+    final String fullDirPath;
+    if (isIOS) {
+      final docsDir = await getApplicationDocumentsDirectory();
+      fullDirPath = '${docsDir.path}/$taskDirectory';
+    } else {
+      // Android/Desktop: taskDirectory is already absolute
+      fullDirPath = taskDirectory;
+    }
+
+    final dir = Directory(fullDirPath);
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+
+    final success = await FileDownloader().enqueue(task);
+    if (kDebugMode) debugPrint('[DownloadService] Enqueue result: $success');
+
+    if (success) {
+      _ref.read(activeDownloadsProvider.notifier).add(trackingUrl ?? url);
+    }
+    return success;
+  }
+
+  Future<String> getDownloadPath(
+    MultimediaItem? item, {
+    Episode? episode,
+    bool absolute = false,
+  }) async {
+    final dir =
+        await getDownloadsDirectory() ??
+        await getApplicationDocumentsDirectory();
+    final sanitizedTitle =
+        item?.title.replaceAll(RegExp(r'[^\w\s-]'), '').trim() ?? "Unknown";
+
+    String path;
+    final publicDir = await _getPublicDownloadsPath();
+
+    if (Platform.isAndroid || Platform.isIOS) {
+      path = "Skystream/$sanitizedTitle";
+      if (absolute) {
+        path = "$publicDir/$path";
+      }
+    } else {
+      path = "${dir.path}/Skystream/$sanitizedTitle";
+    }
+
+    // Add Season subdirectory if it's a series and we have an episode
+    if (item != null &&
+        episode != null &&
+        item.contentType != MultimediaContentType.movie) {
+      // Logic: If there's more than one season in the details, use subdirectories
+      final seasonCount =
+          item.episodes?.map((e) => e.season).toSet().length ?? 0;
+      if (seasonCount > 1) {
+        path = "$path/Season ${episode.season}";
+      }
+    }
+
+    return path;
+  }
+
+  Future<File?> getDownloadedFile(
+    MultimediaItem item, {
+    Episode? episode,
+  }) async {
+    final directoryPath = await getDownloadPath(
+      item,
+      episode: episode,
+      absolute: true,
+    );
+    final directory = Directory(directoryPath);
+    if (!await directory.exists()) return null;
+
+    final sanitizedTitle = item.title
+        .replaceAll(RegExp(r'[^\w\s-]'), '')
+        .trim();
+    String baseName;
+    if (episode != null && item.contentType != MultimediaContentType.movie) {
+      final sanitizedEpName = episode.name
+          .replaceAll(RegExp(r'[^\w\s-]'), '')
+          .trim();
+      baseName = "S${episode.season}-E${episode.episode} $sanitizedEpName";
+    } else {
+      baseName = sanitizedTitle;
+    }
+
+    // Check common extensions
+    final extensions = ['.mp4', '.mkv', '.webm', '.avi'];
+    for (final ext in extensions) {
+      final file = File('$directoryPath/$baseName$ext');
+      if (await file.exists()) {
+        return file;
+      }
+    }
+
+    return null;
+  }
+
+  // Check if battery optimizations are ignored
+  Future<bool> isIgnoringBatteryOptimizations() async {
+    if (!Platform.isAndroid) return true;
+    return await Permission.ignoreBatteryOptimizations.isGranted;
+  }
+
+  // Request user to disable battery optimizations for persistent downloads
+  Future<void> requestIgnoreBatteryOptimizations() async {
+    if (!Platform.isAndroid) return;
+
+    final status = await Permission.ignoreBatteryOptimizations.status;
+    if (!status.isGranted) {
+      if (kDebugMode) {
+        debugPrint('[DownloadService] Requesting ignore battery optimizations');
+      }
+      await Permission.ignoreBatteryOptimizations.request();
+    }
+  }
+
+  Future<bool> deleteDownloadedFile(File file) async {
+    try {
+      if (await file.exists()) {
+        await file.delete();
+        return true;
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[DownloadService] Error deleting file: $e');
+      }
+    }
+    return false;
+  }
+
+  Future<String> _getPublicDownloadsPath() async {
+    if (Platform.isAndroid) {
+      return "/storage/emulated/0/Download";
+    }
+    if (Platform.isIOS) {
+      final dir = await getApplicationDocumentsDirectory();
+      return dir.path;
+    }
+    final dir =
+        await getDownloadsDirectory() ??
+        await getApplicationDocumentsDirectory();
+    return dir.path;
+  }
+}
+
+class DownloadMetadata {
+  final int? size;
+  final String? mimeType;
+
+  DownloadMetadata({this.size, this.mimeType});
+
+  String get sizeString {
+    if (size == null) return "Unknown size";
+    final double mb = size! / (1024 * 1024);
+    if (mb > 1024) {
+      return "${(mb / 1024).toStringAsFixed(2)} GB";
+    }
+    return "${mb.toStringAsFixed(2)} MB";
+  }
+}

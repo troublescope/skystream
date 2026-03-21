@@ -1,6 +1,3 @@
-import 'package:skystream/shared/widgets/focusable_item.dart';
-import 'package:skystream/shared/widgets/thumbnail_error_placeholder.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';

@@ -164,7 +164,7 @@ class SkyStreamPlayerControlsState
         } else {
           _cancelHideTimer();
         }
-        
+
         // REBUILD: If we transition to playing but were stuck in loading UI, trigger rebuild
         if (mounted && val && !oldPlaying && _duration == Duration.zero) {
           setState(() {});
@@ -619,7 +619,7 @@ class SkyStreamPlayerControlsState
 
     if (_isInPip || isSmallWindow) return const SizedBox.shrink();
 
-    // Loading state: simplified UI. If it's playing but duration is zero, 
+    // Loading state: simplified UI. If it's playing but duration is zero,
     // it's likely an unsupported video (audio only) - show controls so user can see source info.
     if (widget.isLoading || (_duration == Duration.zero && !_isPlaying)) {
       if (!widget.forceShowControls) {
@@ -842,7 +842,6 @@ class SkyStreamPlayerControlsState
                         player: widget.player,
                         onSeekStart: _cancelHideTimer,
                       ),
-                      const SizedBox(height: 16),
                       // Actions Row
                       FocusTraversalGroup(
                         policy: OrderedTraversalPolicy(),

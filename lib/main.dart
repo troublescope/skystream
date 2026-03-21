@@ -17,6 +17,7 @@ import 'features/extensions/providers/extensions_controller.dart';
 import 'features/extensions/widgets/extensions_sync_bridge.dart';
 import 'core/providers/update_provider.dart';
 import 'core/widgets/update_dialog.dart';
+import 'core/services/download_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -144,6 +145,7 @@ class _MyAppState extends ConsumerState<MyApp> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(downloadServiceProvider).init();
       _checkExtensionsUpdates();
       _checkAppUpdates();
     });

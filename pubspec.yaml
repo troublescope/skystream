@@ -80,6 +80,9 @@ dependencies:
   http: ^1.6.0
   html_unescape: ^2.0.0
   html: ^0.15.6
+  background_downloader: ^9.5.4
+  flutter_hooks: ^0.21.3+1
+  hooks_riverpod: ^3.1.0
 
 
 dev_dependencies:
