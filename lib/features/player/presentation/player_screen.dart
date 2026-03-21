@@ -408,7 +408,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
         child: Stack(
           children: [
             Positioned(
-              bottom: MediaQuery.sizeOf(context).height < 500 ? 60 : 160,
+              bottom: MediaQuery.sizeOf(context).height < 500 ? 60 : 120,
               left: 0,
               right: 0,
               child: Center(

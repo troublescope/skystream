@@ -742,10 +742,12 @@ class _LanguageButtonState extends State<_LanguageButton> {
 
   @override
   Widget build(BuildContext context) {
-    return Focus(
-      onFocusChange: (hasFocus) => setState(() => _isFocused = hasFocus),
-      child: GestureDetector(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onFocusChange: (hasFocus) => setState(() => _isFocused = hasFocus),
         onTap: widget.onTap,
+        borderRadius: BorderRadius.circular(8),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeInOut,
