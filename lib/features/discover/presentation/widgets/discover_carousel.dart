@@ -289,7 +289,10 @@ class _DiscoverCarouselState extends State<DiscoverCarousel> {
                     placeholder: (context, url) => Container(
                       color: theme.colorScheme.surfaceContainerHighest,
                     ),
-                    errorWidget: (_, _, _) => const ThumbnailErrorPlaceholder(),
+                    errorWidget: (_, _, _) => ThumbnailErrorPlaceholder(
+                      label: title,
+                      isBackdrop: true,
+                    ),
                   ),
                 ),
 
@@ -433,7 +436,10 @@ class _DiscoverCarouselState extends State<DiscoverCarousel> {
             placeholder: (context, url) => Container(
               color: Theme.of(context).colorScheme.surfaceContainerHighest,
             ),
-            errorWidget: (_, _, _) => const ThumbnailErrorPlaceholder(),
+            errorWidget: (_, _, _) => ThumbnailErrorPlaceholder(
+              label: title,
+              isBackdrop: true,
+            ),
           ),
           Container(
             decoration: BoxDecoration(
@@ -488,6 +494,7 @@ class _DiscoverCarouselState extends State<DiscoverCarousel> {
         fit: BoxFit.contain,
         placeholderBuilder: (context) =>
             const SizedBox(height: 140, width: 300),
+        errorBuilder: (context, error, stackTrace) => _buildTitleFallback(title),
       );
     }
     return CachedNetworkImage(

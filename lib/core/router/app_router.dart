@@ -24,9 +24,14 @@ class DetailsRouteExtra {
 
 /// Typed extra for /player. Use when pushing: context.push('/player', extra: PlayerRouteExtra(...)).
 class PlayerRouteExtra {
-  const PlayerRouteExtra({required this.item, required this.videoUrl});
+  const PlayerRouteExtra({
+    required this.item,
+    required this.videoUrl,
+    this.episode,
+  });
   final MultimediaItem item;
   final String videoUrl;
+  final Episode? episode;
 }
 
 /// Typed extra for /tmdb-details.
@@ -163,7 +168,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               body: Center(child: Text('Invalid navigation. Please go back.')),
             );
           }
-          return PlayerScreen(item: extra.item, videoUrl: extra.videoUrl);
+          return PlayerScreen(
+            item: extra.item,
+            videoUrl: extra.videoUrl,
+            episode: extra.episode,
+          );
         },
       ),
     ],

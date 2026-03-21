@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:background_downloader/background_downloader.dart';
 import 'package:dio/dio.dart';
@@ -10,6 +11,8 @@ import 'package:permission_handler/permission_handler.dart'
 import 'package:device_info_plus/device_info_plus.dart';
 
 import '../domain/entity/multimedia_item.dart';
+import '../router/app_router.dart';
+import '../storage/storage_service.dart';
 import '../network/dio_client_provider.dart';
 
 final downloadServiceProvider = Provider<DownloadService>((ref) {
@@ -113,8 +116,11 @@ class DownloadService {
   final Ref _ref;
   final Dio _dio;
   final Set<String> _cancellingUrls = {};
+  final _updatesController = StreamController<TaskUpdate>.broadcast();
 
   DownloadService(this._ref) : _dio = _ref.read(dioClientProvider);
+
+  Stream<TaskUpdate> get updates => _updatesController.stream;
 
   Future<void> init() async {
     // 1. Configure the downloader (chainable API)
@@ -146,8 +152,7 @@ class DownloadService {
           ),
           error: const TaskNotification('{displayName}', 'Download failed'),
           paused: const TaskNotification('{displayName}', 'Download paused'),
-          progressBar: !Platform.isIOS, // Simplified for iOS
-          tapOpensFile: true,
+          progressBar: !Platform.isIOS,
         )
         .configureNotificationForGroup(
           'downloads',
@@ -171,6 +176,7 @@ class DownloadService {
 
     // 4. Listen to updates and process (Reactive Pattern)
     FileDownloader().updates.listen((update) {
+      _updatesController.add(update);
       final trackingUrl = update.task.metaData.isNotEmpty
           ? update.task.metaData
           : update.task.url;
@@ -180,11 +186,11 @@ class DownloadService {
       switch (update) {
         case TaskProgressUpdate():
           final current = _ref.read(downloadProgressProvider)[trackingUrl];
-          
+
           // If we already marked it as complete/failed, ignore lingering progress updates
-          if (current != null && 
-              (current.status == TaskStatus.complete || 
-               current.status == TaskStatus.failed)) {
+          if (current != null &&
+              (current.status == TaskStatus.complete ||
+                  current.status == TaskStatus.failed)) {
             return;
           }
 
@@ -208,7 +214,7 @@ class DownloadService {
             // Force removal from active downloads if it's hitting 100%
             _ref.read(activeDownloadsProvider.notifier).remove(trackingUrl);
           }
-          
+
           _ref
               .read(downloadProgressProvider.notifier)
               .update(trackingUrl, progressData);
@@ -292,6 +298,8 @@ class DownloadService {
         '[DownloadService] Tapped $notificationType for ${task.taskId}',
       );
     }
+    // Navigate to the Downloads tab (LibraryScreen)
+    _ref.read(appRouterProvider).go('/library');
   }
 
   void _handleStatusUpdate(TaskStatusUpdate update, String trackingUrl) {
@@ -392,6 +400,8 @@ class DownloadService {
     required String url,
     required String filename,
     required String directory, // Relative for mobile/mac, absolute for others
+    required MultimediaItem item,
+    Episode? episode,
     String? trackingUrl,
     Map<String, String>? headers,
   }) async {
@@ -506,6 +516,10 @@ class DownloadService {
 
     if (success) {
       _ref.read(activeDownloadsProvider.notifier).add(trackingUrl ?? url);
+      // Save metadata for offline support
+      await _ref
+          .read(storageServiceProvider)
+          .saveDownloadMetadata(task.taskId, item, episode: episode);
     }
     return success;
   }
@@ -607,7 +621,10 @@ class DownloadService {
   Future<bool> deleteDownloadedFile(File file) async {
     try {
       if (await file.exists()) {
+        final parentDir = file.parent;
         await file.delete();
+        // Recursively cleanup empty parent folders
+        await _deleteEmptyParentDirectories(parentDir);
         return true;
       }
     } catch (e) {
@@ -616,6 +633,42 @@ class DownloadService {
       }
     }
     return false;
+  }
+
+  Future<void> _deleteEmptyParentDirectories(Directory directory) async {
+    try {
+      // 1. Safety check: Only delete if it's within a 'Skystream' folder
+      if (!directory.path.contains('Skystream')) return;
+
+      // 2. Stop at the main 'Skystream' root to avoid deleting the base app directory
+      if (directory.path.endsWith('Skystream') ||
+          directory.path.endsWith('Skystream/')) {
+        return;
+      }
+
+      if (await directory.exists()) {
+        // 3. Get non-hidden entities
+        final List<FileSystemEntity> entities = await directory
+            .list()
+            .where(
+              (entity) => !entity.path
+                  .split(Platform.pathSeparator)
+                  .last
+                  .startsWith('.'),
+            )
+            .toList();
+
+        if (entities.isEmpty) {
+          await directory.delete();
+          // 4. Recurse to parent
+          await _deleteEmptyParentDirectories(directory.parent);
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[DownloadService] Error deleting empty folder: $e');
+      }
+    }
   }
 
   Future<String> _getPublicDownloadsPath() async {

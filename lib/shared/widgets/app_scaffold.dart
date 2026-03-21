@@ -72,6 +72,10 @@ class _AppScaffoldState extends ConsumerState<AppScaffold> {
               body: Row(
                 children: [
                   NavigationRail(
+                    elevation: 8,
+                    backgroundColor: Theme.of(
+                      context,
+                    ).appBarTheme.backgroundColor,
                     selectedIndex: _calculateSelectedIndex(context),
                     onDestinationSelected: (index) =>
                         _onItemTapped(index, context),
@@ -104,7 +108,6 @@ class _AppScaffoldState extends ConsumerState<AppScaffold> {
                       ),
                     ],
                   ),
-                  const VerticalDivider(thickness: 1, width: 1),
                   Expanded(child: widget.child),
                 ],
               ),
@@ -147,4 +150,3 @@ class _AppScaffoldState extends ConsumerState<AppScaffold> {
     );
   }
 }
-

@@ -4,10 +4,12 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:skystream/core/domain/entity/multimedia_item.dart';
 import 'package:skystream/core/services/download_service.dart';
 import 'package:skystream/shared/widgets/custom_widgets.dart';
-import '../downloaded_file_provider.dart';
+import 'package:collection/collection.dart';
 import 'package:open_file/open_file.dart';
-import '../details_controller.dart';
+import '../../../library/presentation/downloads_provider.dart';
 import '../../../settings/presentation/player_settings_provider.dart';
+import '../details_controller.dart';
+import '../downloaded_file_provider.dart';
 
 class DownloadManagementDialog extends HookConsumerWidget {
   final MultimediaItem item;
@@ -44,6 +46,10 @@ class DownloadManagementDialog extends HookConsumerWidget {
         ? '${currentItem.title} - ${episode!.name}'
         : currentItem.title;
 
+    final downloads = ref.watch(downloadsProvider).value ?? [];
+    final matchingItem = downloads.firstWhereOrNull((d) =>
+        d.item.url == item.url && d.episode?.url == episode?.url);
+
     return AlertDialog(
       title: Text(title),
       content: const Text(
@@ -61,7 +67,7 @@ class DownloadManagementDialog extends HookConsumerWidget {
         CustomButton(
           isPrimary: false,
           isOutlined: true,
-          onPressed: () => _showDeleteConfirmation(context, ref),
+          onPressed: () => _showDeleteConfirmation(context, ref, matchingItem),
           child: const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
@@ -99,6 +105,7 @@ class DownloadManagementDialog extends HookConsumerWidget {
   Future<void> _showDeleteConfirmation(
     BuildContext context,
     WidgetRef ref,
+    DownloadItem? matchingItem,
   ) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -130,15 +137,16 @@ class DownloadManagementDialog extends HookConsumerWidget {
     );
 
     if (confirmed == true) {
-      final success = await ref
-          .read(downloadServiceProvider)
-          .deleteDownloadedFile(file);
-      if (success) {
-        ref
-            .read(downloadedFilesProvider.notifier)
-            .removeFile(episode?.url ?? item.url);
-        if (context.mounted) Navigator.pop(context);
+      if (matchingItem != null) {
+        await ref.read(downloadsProvider.notifier).removeDownload(matchingItem);
+      } else {
+        await ref.read(downloadServiceProvider).deleteDownloadedFile(file);
       }
+
+      ref
+          .read(downloadedFilesProvider.notifier)
+          .removeFile(episode?.url ?? item.url);
+      if (context.mounted) Navigator.pop(context);
     }
   }
 
@@ -160,7 +168,7 @@ class DownloadManagementDialog extends HookConsumerWidget {
           .read(detailsControllerProvider(item.url).notifier)
           .handlePlayPress(
             context,
-            details.copyWith(provider: 'Local'),
+            details,
             specificEpisode: episode,
             overrideUrl: file.path,
           );

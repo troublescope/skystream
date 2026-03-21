@@ -250,7 +250,7 @@ class ExternalPlayerService {
       String launchUrl;
 
       if (player.id == 'vlc') {
-        launchUrl = 'vlc://${Uri.encodeComponent(videoUrl)}';
+        launchUrl = 'vlc://${Uri.encodeFull(videoUrl)}';
       } else if (player.id == 'infuse') {
         launchUrl =
             'infuse://x-callback-url/play?url=${Uri.encodeComponent(videoUrl)}';
@@ -264,7 +264,7 @@ class ExternalPlayerService {
           'nplayer-http://',
         );
       } else {
-        launchUrl = '${player.iosScheme}${Uri.encodeComponent(videoUrl)}';
+        launchUrl = '${player.iosScheme}${Uri.encodeFull(videoUrl)}';
       }
 
       final uri = Uri.parse(launchUrl);

@@ -196,9 +196,48 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
                           child: ShimmerPlaceholder(borderRadius: 12),
                         ),
                       ),
-                      error: (err, stack) => SizedBox(
+                      error: (err, stack) => Container(
                         height: 500,
-                        child: Center(child: Text('Error: $err')),
+                        margin: const EdgeInsets.only(
+                          bottom: LayoutConstants.spacingLg,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest.withValues(
+                            alpha: 0.3,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.error_outline_rounded,
+                                size: 48,
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                              const SizedBox(height: 16),
+                              const Text(
+                                "Couldn't load trending items",
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              TextButton.icon(
+                                onPressed:
+                                    () => ref.invalidate(
+                                      discoverHeroMovieProvider,
+                                    ),
+                                icon: const Icon(Icons.refresh),
+                                label: const Text("Retry"),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     );
                   },

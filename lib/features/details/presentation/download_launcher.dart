@@ -8,6 +8,8 @@ import '../../../core/extensions/extension_manager.dart';
 import '../../../core/extensions/base_provider.dart';
 import '../../../core/services/download_service.dart';
 import '../../../core/router/app_router.dart';
+import '../../../shared/widgets/loading_dialog.dart';
+import '../../../shared/widgets/custom_widgets.dart';
 
 class DownloadLauncher {
   final Ref _ref;
@@ -22,22 +24,11 @@ class DownloadLauncher {
     final resolveUrl = episodeUrl ?? item.url;
     if (resolveUrl.isEmpty) return;
 
-    // 1. Show resolving snackbar
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Row(
-          children: [
-            SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-            SizedBox(width: 12),
-            Text('Resolving download sources...'),
-          ],
-        ),
-        duration: Duration(seconds: 10),
-      ),
+    bool isCanceled = false;
+    LoadingDialog.show(
+      context,
+      message: 'Resolving download sources...',
+      onCancel: () => isCanceled = true,
     );
 
     try {
@@ -58,9 +49,9 @@ class DownloadLauncher {
       if (provider == null) throw Exception('No active provider');
 
       final streams = await provider.loadStreams(resolveUrl);
-      if (!context.mounted) return;
+      if (isCanceled || !context.mounted) return;
 
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      Navigator.of(context).pop(); // Dismiss loading dialog
 
       if (streams.isEmpty) {
         throw Exception('No download sources found for this item.');
@@ -70,7 +61,7 @@ class DownloadLauncher {
       _showSourcePicker(context, streams, item, resolveUrl);
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      if (!isCanceled) Navigator.of(context).pop(); // Dismiss if still there
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error: $e')));
@@ -147,15 +138,13 @@ class DownloadLauncher {
     // Use root navigator context if current context is unmounted
     final navContext = rootNavigatorKey.currentContext ?? context;
 
-    bool dialogOpen = true;
-    BuildContext? dialogContext;
+    bool isCanceled = false;
     showDialog(
       context: navContext,
-      barrierDismissible: true,
+      barrierDismissible: false, // Block UI interaction
       builder: (ctx) {
-        dialogContext = ctx;
         return PopScope(
-          onPopInvokedWithResult: (didPop, result) => dialogOpen = false,
+          canPop: false,
           child: AlertDialog(
             content: const Column(
               mainAxisSize: MainAxisSize.min,
@@ -166,12 +155,16 @@ class DownloadLauncher {
               ],
             ),
             actions: [
-              TextButton(
+              CustomButton(
+                isPrimary: false,
                 onPressed: () {
-                  dialogOpen = false;
+                  isCanceled = true;
                   Navigator.of(ctx).pop();
                 },
-                child: const Text('Cancel'),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Text('Cancel'),
+                ),
               ),
             ],
           ),
@@ -179,27 +172,15 @@ class DownloadLauncher {
       },
     );
 
-    // Safety timeout: dismiss dialog after 15s if it's still there
-    Future.delayed(const Duration(seconds: 15), () {
-      if (dialogOpen) {
-        if (dialogContext != null && dialogContext!.mounted) {
-          Navigator.of(dialogContext!).pop();
-        }
-        dialogOpen = false;
-      }
-    });
-
     final metadata = await downloadService
         .getMetadata(stream.url, headers: stream.headers)
         .timeout(const Duration(seconds: 15), onTimeout: () => null);
 
-    if (dialogOpen) {
-      if (dialogContext != null && dialogContext!.mounted) {
-        Navigator.of(dialogContext!).pop();
-      } else if (navContext.mounted) {
-        Navigator.of(navContext, rootNavigator: true).pop();
-      }
-      dialogOpen = false;
+    if (!navContext.mounted) return;
+    if (!isCanceled) {
+      Navigator.of(navContext, rootNavigator: true).pop();
+    } else {
+      return; // Canceled, don't proceed
     }
 
     final finalContext = rootNavigatorKey.currentContext ?? navContext;
@@ -265,6 +246,8 @@ class DownloadLauncher {
                   url: stream.url,
                   filename: filename,
                   directory: saveDir,
+                  item: item,
+                  episode: episodeData,
                   trackingUrl: resolveUrl,
                   headers: stream.headers,
                 );

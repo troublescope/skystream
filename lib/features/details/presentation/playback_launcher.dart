@@ -10,7 +10,10 @@ import '../../../core/extensions/extension_manager.dart';
 import '../../../core/extensions/base_provider.dart';
 import '../../../core/extensions/providers.dart';
 import '../../settings/presentation/player_settings_provider.dart';
+import 'package:collection/collection.dart';
 import 'details_controller.dart';
+import '../../../core/services/download_service.dart';
+import '../../../shared/widgets/loading_dialog.dart';
 
 class PlaybackLauncher {
   final Ref _ref;
@@ -26,6 +29,14 @@ class PlaybackLauncher {
     final settings = await _ref.read(playerSettingsProvider.future);
     if (!context.mounted) return;
 
+    // Smart Intercept: Check if this item/episode is downloaded
+    final itemToCheck = detailedItem ?? baseItem;
+    final episode = itemToCheck.episodes?.firstWhereOrNull((e) => e.url == url);
+    final downloadService = _ref.read(downloadServiceProvider);
+    final localFile = await downloadService.getDownloadedFile(itemToCheck, episode: episode);
+
+    final String finalUrl = localFile?.path ?? url;
+
     if (settings.preferredPlayer != null) {
       if (baseItem.url.isNotEmpty) {
         _ref
@@ -34,7 +45,7 @@ class PlaybackLauncher {
       }
       _launchExternal(
         context,
-        url,
+        finalUrl,
         detailedItem ?? baseItem,
         settings.preferredPlayer!,
       ).whenComplete(() {
@@ -47,7 +58,11 @@ class PlaybackLauncher {
     } else {
       context.push(
         '/player',
-        extra: PlayerRouteExtra(item: detailedItem ?? baseItem, videoUrl: url),
+        extra: PlayerRouteExtra(
+          item: detailedItem ?? baseItem,
+          videoUrl: finalUrl,
+          episode: episode,
+        ),
       );
     }
   }
@@ -58,21 +73,21 @@ class PlaybackLauncher {
     MultimediaItem item,
     String playerId,
   ) async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Row(
-          children: [
-            SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-            SizedBox(width: 12),
-            Text('Resolving streams...'),
-          ],
-        ),
-        duration: Duration(seconds: 10),
-      ),
+    // If it's a local file, we can skip stream resolution
+    if (episodeDataUrl.startsWith('/') || episodeDataUrl.startsWith('file:')) {
+      final stream = StreamResult(
+        url: episodeDataUrl,
+        source: 'Local',
+      );
+      await _launchStream(context, stream, item, episodeDataUrl, playerId);
+      return;
+    }
+
+    bool isCanceled = false;
+    LoadingDialog.show(
+      context,
+      message: 'Resolving streams...',
+      onCancel: () => isCanceled = true,
     );
 
     try {
@@ -92,9 +107,9 @@ class PlaybackLauncher {
       if (provider == null) throw Exception('No active provider');
 
       final streams = await provider.loadStreams(episodeDataUrl);
-      if (!context.mounted) return;
+      if (isCanceled || !context.mounted) return;
 
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      Navigator.of(context).pop(); // Dismiss loading dialog
 
       if (streams.isEmpty) {
         final playerName =
@@ -136,7 +151,7 @@ class PlaybackLauncher {
       }
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      if (!isCanceled) Navigator.of(context).pop(); // Dismiss if still there
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e. Using internal player.')),
       );

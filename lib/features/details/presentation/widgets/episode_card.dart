@@ -50,8 +50,18 @@ class EpisodeCard extends HookConsumerWidget {
       ),
     );
 
-    final epPos = historyRepo.getEpisodePosition(episode.url);
-    final epDur = historyRepo.getEpisodeDuration(episode.url);
+    final epPos = historyRepo.getEpisodePosition(
+      episode.url,
+      mainUrl: parentItem.url,
+      season: episode.season,
+      episode: episode.episode,
+    );
+    final epDur = historyRepo.getEpisodeDuration(
+      episode.url,
+      mainUrl: parentItem.url,
+      season: episode.season,
+      episode: episode.episode,
+    );
 
     final double progress = epDur > 0 ? epPos / epDur : 0;
     String? statusBadge;

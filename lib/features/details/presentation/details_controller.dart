@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:collection/collection.dart';
 import '../../../../core/domain/entity/multimedia_item.dart';
 import '../../../core/extensions/base_provider.dart';
 import '../../../core/extensions/extension_manager.dart';
@@ -257,10 +258,37 @@ class DetailsController extends Notifier<DetailsState> {
     final lastEpisodeUrl = historyRepo.getLastEpisodeUrl(contextItem.url);
 
     if (lastEpisodeUrl != null) {
-      final lastIndex = allEpisodes.indexWhere((e) => e.url == lastEpisodeUrl);
+      int lastIndex = allEpisodes.indexWhere((e) => e.url == lastEpisodeUrl);
+      
+      // Fallback: Match by season/episode numbers if URL matching fails
+      if (lastIndex == -1) {
+        final mainHistoryItem = ref.read(watchHistoryProvider).firstWhereOrNull(
+          (h) => h.item.url == contextItem.url,
+        );
+        if (mainHistoryItem != null && 
+            mainHistoryItem.season != null && 
+            mainHistoryItem.episode != null) {
+          lastIndex = allEpisodes.indexWhere(
+            (e) => e.season == mainHistoryItem.season && 
+                   e.episode == mainHistoryItem.episode,
+          );
+        }
+      }
+
       if (lastIndex != -1) {
-        final pos = historyRepo.getEpisodePosition(lastEpisodeUrl);
-        final dur = historyRepo.getEpisodeDuration(lastEpisodeUrl);
+        final matchedEp = allEpisodes[lastIndex];
+        final pos = historyRepo.getEpisodePosition(
+          matchedEp.url,
+          mainUrl: contextItem.url,
+          season: matchedEp.season,
+          episode: matchedEp.episode,
+        );
+        final dur = historyRepo.getEpisodeDuration(
+          matchedEp.url,
+          mainUrl: contextItem.url,
+          season: matchedEp.season,
+          episode: matchedEp.episode,
+        );
         final progress = dur > 0 ? pos / dur : 0;
 
         if (progress > 0.95) {

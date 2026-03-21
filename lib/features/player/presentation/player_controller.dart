@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:media_kit/media_kit.dart';
@@ -108,6 +110,7 @@ class PlayerController extends Notifier<PlayerState> {
   late Player _player;
   late MultimediaItem _item;
   late String _videoUrl;
+  Episode? _episode;
   Timer? _torrentPollTimer;
   bool _isPolling = false;
 
@@ -150,10 +153,12 @@ class PlayerController extends Notifier<PlayerState> {
     required Player player,
     required MultimediaItem item,
     required String videoUrl,
+    Episode? episode,
   }) async {
     state = const PlayerState(); // Reset stale state
     _player = player;
     _videoUrl = videoUrl;
+    _episode = episode;
 
     _item = item;
 
@@ -529,7 +534,13 @@ class PlayerController extends Notifier<PlayerState> {
 
       int savedPos = 0;
       if (isSeries) {
-        savedPos = historyRepo.getEpisodePosition(_videoUrl);
+        final ep = _item.episodes?.firstWhereOrNull((e) => e.url == _videoUrl);
+        savedPos = historyRepo.getEpisodePosition(
+          _videoUrl,
+          mainUrl: _item.url,
+          season: ep?.season,
+          episode: ep?.episode,
+        );
       } else {
         savedPos = historyRepo.getPosition(_item.url);
       }
@@ -748,8 +759,8 @@ class PlayerController extends Notifier<PlayerState> {
       final itemToSave = _item.copyWith(provider: pId);
 
       // Identify current episode if series
-      Episode? currentEpisode;
-      if (isSeries) {
+      Episode? currentEpisode = _episode;
+      if (isSeries && currentEpisode == null) {
         try {
           currentEpisode = _item.episodes!.firstWhere(
             (e) => e.url == _videoUrl,

@@ -21,6 +21,7 @@ class StorageService {
   static const String kLibraryBox = 'library_box';
   static const String kSettingsBox = 'settings_box';
   static const String kExtensionsBox = 'extension_data_box';
+  static const String kDownloadMetadataBox = 'download_metadata_box';
 
   Future<void> init() async {
     final supportDir = await getApplicationSupportDirectory();
@@ -29,6 +30,7 @@ class StorageService {
     _libraryBox = await _safeOpenBox(kLibraryBox);
     _settingsBox = await _safeOpenBox(kSettingsBox);
     _extensionsBox = await _safeOpenBox(kExtensionsBox);
+    await _safeOpenBox(kDownloadMetadataBox); // Open but no need to keep late reference if we use Hive.box()
     await initHistory();
   }
 
@@ -308,11 +310,22 @@ class StorageService {
     return 0;
   }
 
-  int getEpisodePosition(String epUrl) {
+  int getEpisodePosition(String epUrl, {String? mainUrl, int? season, int? episode}) {
     final epKey = "EP_${_getKey(epUrl)}";
     if (_historyBox.containsKey(epKey)) {
       final map = _historyBox.get(epKey);
       return map['position'] ?? 0;
+    }
+
+    // Fallback: If we have season/episode info, look into the main item entry
+    if (mainUrl != null && season != null && episode != null) {
+      final mainKey = _getKey(mainUrl);
+      if (_historyBox.containsKey(mainKey)) {
+        final map = _historyBox.get(mainKey);
+        if (map['season'] == season && map['episode'] == episode) {
+          return map['position'] ?? 0;
+        }
+      }
     }
     return 0;
   }
@@ -332,11 +345,22 @@ class StorageService {
     return 0;
   }
 
-  int getEpisodeDuration(String epUrl) {
+  int getEpisodeDuration(String epUrl, {String? mainUrl, int? season, int? episode}) {
     final epKey = "EP_${_getKey(epUrl)}";
     if (_historyBox.containsKey(epKey)) {
       final map = _historyBox.get(epKey);
       return map['duration'] ?? 0;
+    }
+
+    // Fallback: Look into main item entry
+    if (mainUrl != null && season != null && episode != null) {
+      final mainKey = _getKey(mainUrl);
+      if (_historyBox.containsKey(mainKey)) {
+        final map = _historyBox.get(mainKey);
+        if (map['season'] == season && map['episode'] == episode) {
+          return map['duration'] ?? 0;
+        }
+      }
     }
     return 0;
   }
@@ -403,6 +427,27 @@ class StorageService {
     }
   }
 
+  Future<void> saveDownloadMetadata(String taskId, MultimediaItem item, {Episode? episode}) async {
+    final box = await Hive.openBox(kDownloadMetadataBox);
+    await box.put(taskId, {
+      'item': item.toJson(),
+      'episode': episode?.toJson(),
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  Future<Map<String, dynamic>?> getDownloadMetadata(String taskId) async {
+    final box = await Hive.openBox(kDownloadMetadataBox);
+    final data = box.get(taskId);
+    if (data == null) return null;
+    return Map<String, dynamic>.from(data);
+  }
+
+  Future<void> removeDownloadMetadata(String taskId) async {
+    final box = await Hive.openBox(kDownloadMetadataBox);
+    await box.delete(taskId);
+  }
+
   Future<void> deleteAllData() async {
     try {
       // Delete Extensions Folder (Application Support)
@@ -414,8 +459,13 @@ class StorageService {
 
       // Clear Preferences (Hive + Prefs) - For Factory Reset, we do NOT keep repos.
       await clearPreferences(keepRepos: false);
+      
+      try {
+        await Hive.deleteBoxFromDisk(kDownloadMetadataBox);
+      } catch (_) {}
 
       // Clear Cache Manager (Images)
+// ... (rest of the code)
       try {
         await DefaultCacheManager().emptyCache();
       } catch (e) {

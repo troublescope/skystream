@@ -93,10 +93,20 @@ class DetailsActionButtons extends HookConsumerWidget {
     );
 
     final pos = targetEpisode != null
-        ? historyRepo.getEpisodePosition(targetEpisode.url)
+        ? historyRepo.getEpisodePosition(
+            targetEpisode.url,
+            mainUrl: item.url,
+            season: targetEpisode.season,
+            episode: targetEpisode.episode,
+          )
         : historyRepo.getPosition(item.url);
     final dur = targetEpisode != null
-        ? historyRepo.getEpisodeDuration(targetEpisode.url)
+        ? historyRepo.getEpisodeDuration(
+            targetEpisode.url,
+            mainUrl: item.url,
+            season: targetEpisode.season,
+            episode: targetEpisode.episode,
+          )
         : historyRepo.getDuration(item.url);
 
     final bool isResuming = pos > 5000;

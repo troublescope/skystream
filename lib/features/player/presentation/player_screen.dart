@@ -21,8 +21,14 @@ import 'player_controller.dart';
 class PlayerScreen extends ConsumerStatefulWidget {
   final MultimediaItem item;
   final String videoUrl;
+  final Episode? episode;
 
-  const PlayerScreen({super.key, required this.item, required this.videoUrl});
+  const PlayerScreen({
+    super.key,
+    required this.item,
+    required this.videoUrl,
+    this.episode,
+  });
 
   @override
   ConsumerState<PlayerScreen> createState() => _PlayerScreenState();
@@ -94,6 +100,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
         player: _player,
         item: widget.item,
         videoUrl: widget.videoUrl,
+        episode: widget.episode,
       );
     });
   }

@@ -100,16 +100,16 @@ class HistoryRepository {
     return _storageService.getPosition(url);
   }
 
-  int getEpisodePosition(String url) {
-    return _storageService.getEpisodePosition(url);
+  int getEpisodePosition(String url, {String? mainUrl, int? season, int? episode}) {
+    return _storageService.getEpisodePosition(url, mainUrl: mainUrl, season: season, episode: episode);
   }
 
   int getDuration(String url) {
     return _storageService.getDuration(url);
   }
 
-  int getEpisodeDuration(String url) {
-    return _storageService.getEpisodeDuration(url);
+  int getEpisodeDuration(String url, {String? mainUrl, int? season, int? episode}) {
+    return _storageService.getEpisodeDuration(url, mainUrl: mainUrl, season: season, episode: episode);
   }
 
   String? getLastStreamUrl(String url) {

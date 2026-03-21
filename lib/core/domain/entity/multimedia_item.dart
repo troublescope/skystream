@@ -313,6 +313,8 @@ class MultimediaItem {
     String? playbackPolicy,
     bool? isAdult,
     NextAiring? nextAiring,
+    List<StreamResult>? streams,
+    int? tmdbId,
   }) {
     return MultimediaItem(
       title: title ?? this.title,
@@ -338,7 +340,8 @@ class MultimediaItem {
       playbackPolicy: playbackPolicy ?? this.playbackPolicy,
       isAdult: isAdult ?? this.isAdult,
       nextAiring: nextAiring ?? this.nextAiring,
-      streams: streams ?? streams,
+      streams: streams ?? this.streams,
+      tmdbId: tmdbId ?? this.tmdbId,
     );
   }
 
