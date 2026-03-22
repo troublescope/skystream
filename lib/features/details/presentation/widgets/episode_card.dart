@@ -128,18 +128,26 @@ class EpisodeCard extends HookConsumerWidget {
           child: Container(
             width: width,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainer,
+              color: Theme.of(context).colorScheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(12.0),
               border: Border.all(
                 color: isFocused.value
-                    ? Colors.white
-                    : Theme.of(context).dividerColor.withValues(alpha: 0.1),
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).dividerColor.withValues(
+                      alpha: Theme.of(context).brightness == Brightness.dark
+                          ? 0.1
+                          : 0.5,
+                    ),
                 width: isFocused.value ? 2 : 1,
               ),
               boxShadow: isFocused.value
                   ? [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.3),
+                        color: Colors.black.withValues(
+                          alpha: Theme.of(context).brightness == Brightness.dark
+                              ? 0.3
+                              : 0.15,
+                        ),
                         blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
@@ -164,7 +172,7 @@ class EpisodeCard extends HookConsumerWidget {
                           fontWeight: FontWeight.bold,
                           color: isFocused.value
                               ? Theme.of(context).colorScheme.primary
-                              : Colors.white,
+                              : Theme.of(context).colorScheme.onSurface,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -275,10 +283,10 @@ class EpisodeCard extends HookConsumerWidget {
       );
     } else {
       return IconButton(
-        icon: const Icon(
+        icon: Icon(
           Icons.file_download_outlined,
           size: 32,
-          color: Colors.white70,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(),
