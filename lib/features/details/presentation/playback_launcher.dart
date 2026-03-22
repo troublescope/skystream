@@ -37,7 +37,7 @@ class PlaybackLauncher {
     final localFile = await downloadService.getDownloadedFile(itemToCheck, episode: episode);
     if (!context.mounted) return;
 
-    final String finalUrl = localFile?.path ?? url;
+    final String finalUrl = AppUtils.normalizeUrl(localFile?.path ?? url);
 
     if (settings.preferredPlayer != null) {
       if (baseItem.url.isNotEmpty) {
@@ -86,10 +86,14 @@ class PlaybackLauncher {
     }
 
     bool isCanceled = false;
+    bool dialogDismissed = false;
     LoadingDialog.show(
       context,
       message: 'Resolving streams...',
-      onCancel: () => isCanceled = true,
+      onCancel: () {
+        isCanceled = true;
+        dialogDismissed = true;
+      },
     );
 
     try {
@@ -111,7 +115,10 @@ class PlaybackLauncher {
       final streams = await provider.loadStreams(episodeDataUrl);
       if (isCanceled || !context.mounted) return;
 
-      Navigator.of(context).pop(); // Dismiss loading dialog
+      if (!dialogDismissed) {
+        Navigator.of(context).pop(); // Dismiss loading dialog
+        dialogDismissed = true;
+      }
 
       if (streams.isEmpty) {
         final playerName =
@@ -153,7 +160,10 @@ class PlaybackLauncher {
       }
     } catch (e) {
       if (!context.mounted) return;
-      if (!isCanceled) Navigator.of(context).pop(); // Dismiss if still there
+      if (!isCanceled && !dialogDismissed) {
+        Navigator.of(context).pop(); // Dismiss if still there
+        dialogDismissed = true;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e. Using internal player.')),
       );

@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:open_file/open_file.dart';
+import '../utils/app_utils.dart';
 
 /// Represents an external video player that can be launched from Skystream.
 class ExternalPlayer {
@@ -178,21 +180,23 @@ class ExternalPlayerService {
     if (player == null) return false;
 
     try {
+      final normalizedUrl = AppUtils.normalizeUrl(videoUrl);
+
       if (Platform.isAndroid) {
         return await _launchAndroid(
-          videoUrl,
+          normalizedUrl,
           player,
           headers: headers,
           title: title,
         );
       } else if (Platform.isIOS) {
-        return await _launchIOS(videoUrl, player);
+        return await _launchIOS(normalizedUrl, player);
       } else if (Platform.isMacOS) {
-        return await _launchMacOS(videoUrl, player);
+        return await _launchMacOS(normalizedUrl, player);
       } else if (Platform.isWindows) {
-        return await _launchWindows(videoUrl, player);
+        return await _launchWindows(normalizedUrl, player);
       } else if (Platform.isLinux) {
-        return await _launchLinux(videoUrl, player);
+        return await _launchLinux(normalizedUrl, player);
       }
     } catch (e) {
       if (kDebugMode) debugPrint('ExternalPlayer launch error: $e');
@@ -243,6 +247,14 @@ class ExternalPlayerService {
   // -- iOS: Custom URL scheme --
 
   Future<bool> _launchIOS(String videoUrl, ExternalPlayer player) async {
+    if (AppUtils.isLocalFile(videoUrl)) {
+      // Local files on iOS cannot be easily shared via URL schemes
+      // due to sandbox restrictions. Use Open-In which is the standard mechanism.
+      final path = videoUrl.replaceFirst('file://', '');
+      final result = await OpenFile.open(path);
+      return result.type == ResultType.done;
+    }
+
     if (player.iosScheme != null) {
       // VLC: vlc://url
       // Infuse: infuse://x-callback-url/play?url=...
@@ -285,6 +297,8 @@ class ExternalPlayerService {
   Future<bool> _launchMacOS(String videoUrl, ExternalPlayer player) async {
     try {
       if (player.macAppName != null) {
+        // 'open -a' is a launcher that returns immediately after starting the app.
+        // Process.run is perfect here to catch "App not found" without blocking.
         final result = await Process.run('open', [
           '-a',
           player.macAppName!,
@@ -293,8 +307,11 @@ class ExternalPlayerService {
         return result.exitCode == 0;
       }
       if (player.desktopCommand != null) {
-        final result = await Process.run(player.desktopCommand!, [videoUrl]);
-        return result.exitCode == 0;
+        if (await _isCommandAvailable(player.desktopCommand!)) {
+          await Process.start(player.desktopCommand!, [videoUrl],
+              mode: ProcessStartMode.detached);
+          return true;
+        }
       }
     } catch (e) {
       if (kDebugMode) debugPrint('macOS launch error: $e');
@@ -333,8 +350,11 @@ class ExternalPlayerService {
     try {
       // 1. Try running by command name (works if it's in PATH)
       try {
-        final result = await Process.run(command, [videoUrl]);
-        if (result.exitCode == 0) return true;
+        if (await _isCommandAvailable(command)) {
+          await Process.start(command, [videoUrl],
+              mode: ProcessStartMode.detached);
+          return true;
+        }
       } catch (_) {
         // Not in PATH — try common install directories
       }
@@ -345,8 +365,9 @@ class ExternalPlayerService {
         try {
           final f = File(exePath);
           if (await f.exists()) {
-            final result = await Process.run(exePath, [videoUrl]);
-            if (result.exitCode == 0) return true;
+            await Process.start(exePath, [videoUrl],
+                mode: ProcessStartMode.detached);
+            return true;
           }
         } catch (_) {
           continue;
@@ -355,9 +376,12 @@ class ExternalPlayerService {
 
       // 3. Last resort: use Windows shell `start` to open with default handler
       try {
+        // We use Process.run here as `start` is a cmd internal and returning 
+        // quickly is already handled by start /b or similar if needed,
+        // but for safety with playUrl, run is fine for the fallback.
         final result = await Process.run(
           'cmd',
-          ['/c', 'start', '', videoUrl],
+          ['/c', 'start', '', '"$videoUrl"'],
           runInShell: true,
         );
         return result.exitCode == 0;
@@ -374,8 +398,11 @@ class ExternalPlayerService {
     try {
       if (player.desktopCommand != null) {
         try {
-          final result = await Process.run(player.desktopCommand!, [videoUrl]);
-          return result.exitCode == 0;
+          if (await _isCommandAvailable(player.desktopCommand!)) {
+            await Process.start(player.desktopCommand!, [videoUrl],
+                mode: ProcessStartMode.detached);
+            return true;
+          }
         } catch (_) {
           // Command not recognized or not in PATH
         }
@@ -384,5 +411,15 @@ class ExternalPlayerService {
       if (kDebugMode) debugPrint('Linux launch error: $e');
     }
     return false;
+  }
+
+  Future<bool> _isCommandAvailable(String command) async {
+    try {
+      final executable = Platform.isWindows ? 'where' : 'which';
+      final result = await Process.run(executable, [command]);
+      return result.exitCode == 0;
+    } catch (_) {
+      return false;
+    }
   }
 }

@@ -1018,7 +1018,7 @@ class PlayerController extends Notifier<PlayerState> {
       return null;
     }
 
-    return stream.url;
+    return AppUtils.normalizeUrl(stream.url);
   }
 
   /// Applies per-playback MPV properties (headers, cookies, DRM).

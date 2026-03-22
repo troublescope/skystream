@@ -24,4 +24,17 @@ class AppUtils {
     if (path.startsWith('file:')) return true;
     return false;
   }
+
+  static String normalizeUrl(String url) {
+    if (isLocalFile(url) && !url.startsWith('file:')) {
+      if (url.startsWith('/')) {
+        return 'file://$url';
+      }
+      // Windows absolute path like C:\
+      // Standardize on forward slashes for valid file:/// URIs
+      final standardizedPath = url.replaceAll('\\', '/');
+      return 'file:///$standardizedPath';
+    }
+    return url;
+  }
 }
