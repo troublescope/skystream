@@ -85,6 +85,13 @@ class ExternalPlayerService {
       androidPackage: 'is.xyz.mpv',
     ),
     ExternalPlayer(
+      id: 'mpvex',
+      displayName: 'mpvEx',
+      icon: Icons.videocam_outlined,
+      supportedPlatforms: {TargetPlatform.android},
+      androidPackage: 'app.marlboroadvance.mpvex',
+    ),
+    ExternalPlayer(
       id: 'mpv',
       displayName: 'mpv',
       icon: Icons.videocam,
