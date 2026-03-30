@@ -81,6 +81,8 @@ assets/plugins/
 packages/flutter_torrent_server/go_src/.gradle/
 /coverage/
 plugins/
+!docs/plugins/
+!docs/plugins/*.md
 keystore/
 skystream-plugins/
 skystream-tools/

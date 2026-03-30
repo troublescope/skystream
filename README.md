@@ -134,6 +134,11 @@ SkyStream is not on the App Store. You must **sideload** it using a computer.
 ### Extension Development
 This app uses a custom JS runtime for extensions.
 *   **See [PLUGIN_DEVELOPMENT_GUIDE.md](docs/PLUGIN_DEVELOPMENT_GUIDE.md) for a complete guide on packaging and releasing your plugins.**
+*   **Curated docs:** [Plugin Docs Index](docs/plugins/README.md)
+*   **Quickstart:** [Plugin Quickstart](docs/plugins/01_QUICKSTART.md)
+*   **Spec:** [Manifest and Repository Spec](docs/plugins/02_MANIFEST_AND_REPOSITORY_SPEC.md)
+*   **API:** [Plugin Runtime API Reference](docs/plugins/03_PLUGIN_RUNTIME_API.md)
+*   **Debugging:** [Plugin Troubleshooting](docs/plugins/04_TROUBLESHOOTING.md)
 
 
 ## FAQ
